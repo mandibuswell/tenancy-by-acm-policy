@@ -3,7 +3,7 @@ object-templates-raw: |
   {{- $name := $tenant.metadata.name }}
   {{- $domain := (lookup "config.openshift.io/v1" "Ingress" "" "cluster").spec.domain }}
   {{- $loginTheme := $name }}
-  {{- if eq $name "battlestar" }}{{ $loginTheme = "battlestargalactica" }}{{ end }}
+  {{- if eq $name "battlestar" }}{{ $loginTheme = "bsg" }}{{ end }}
   - complianceType: musthave
     objectDefinition:
       apiVersion: k8s.keycloak.org/v2alpha1
