@@ -2,14 +2,14 @@
 apiVersion: dusty-seahorse.io/v1alpha1
 kind: Tenant
 metadata:
-  name: deepspacenine
+  name: startrek
   namespace: tenancies
 spec:
-  displayName: "Deep Space Nine"
+  displayName: "Star Trek"
   owner: platform-team@example.com
-  adminGroup: deepspacenine-tenant-admin
-  userGroup: deepspacenine-tenant-user
-  viewerGroup: deepspacenine-tenant-viewer
+  adminGroup: startrek-tenant-admin
+  userGroup: startrek-tenant-user
+  viewerGroup: startrek-tenant-viewer
 
   resourceQuota:
     cpu: "86"
@@ -32,6 +32,6 @@ spec:
       myASN: 64500
       peerASN: 64502
       peerAddress: "192.168.1.2"
-      vrf: deepspacenine-vrf
+      vrf: startrek-vrf
       addresses:
         - "192.168.12.0/24"
