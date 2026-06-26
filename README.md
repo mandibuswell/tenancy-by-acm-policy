@@ -5,7 +5,7 @@ Use ACM PolicyGenerator with ArgoCD openshift-gitops to deliver multi-tenant iso
 Policies are organised by NIST SP 800-53 control family:
 - **AC-Access-Control** — ACM fine-grained RBAC (`MulticlusterRoleAssignment`) for KubeVirt/VM access on managed clusters, hub `ClusterRoleBinding`s for ACM fleet console visibility, and managed-cluster `RoleBinding`s for Tenant-Admin/Tenant-User/Tenant-Viewer namespace access.
 - **CM-Configuration-Management** — Creates tenant namespaces, ResourceQuotas, ApplicationAwareResourceQuotas (VM limits), LimitRanges, UserDefinedNetworks (OVN-isolated primary networks), and MetalLB BGP peering on managed clusters.
-- **SC-System-and-Communications-Protection** — Deploys the Tenant CRD and replicates Tenant CRs from the hub to managed clusters, establishing the foundation for all other tenant policies.
+- **SC-System-and-Communications-Protection** — Deploys the Tenant CRD and replicates Tenant CRs from the hub to managed clusters, establishing the foundation for all other tenant policies. On the hub, also provisions baseline Keycloak realms (`admin@`, `user@`, `viewer@` at `<tenant>.local`) when Keycloak is installed.
 
 A custom `Tenant` CRD (`dusty-seahorse.io/v1alpha1`) in `tenancies/` provides the single source of truth for each tenant's identity, RBAC groups, quotas, and network settings. A hub-side policy in the `tenancies` namespace uses `{{hub range hub}}` templates to replicate every `Tenant` CR to managed clusters. Managed-cluster policies then iterate those local Tenant CRs with `{{ range }}` to create namespaces, quotas, network resources, and RoleBindings. Hub-side ACM fine-grained RBAC policies generate `MulticlusterRoleAssignment`s and `ClusterRoleBinding`s directly from the Tenant CRs — adding a tenant is just creating a CR.
 
@@ -53,7 +53,7 @@ Each ArgoCD Application syncs a `policygen/` folder. Kustomize runs the **Policy
 |---|---|---|
 | `tenancy-access-control` | AC | ClusterRoleBindings, MulticlusterRoleAssignments, namespace RoleBindings |
 | `tenancy-configuration-management` | CM | Namespaces, ResourceQuotas, AAQ, LimitRanges, UDNs, MetalLB BGP |
-| `tenancy-system-and-communications-protection` | SC | Tenant CRD, tenancies namespace, replicated Tenant CRs |
+| `tenancy-system-and-communications-protection` | SC | Tenant CRD, tenancies namespace, replicated Tenant CRs, hub Keycloak realm imports |
 | `tenancy-base` | — | Tenant CRs (source of truth) |
 | `tenancy-placements` | — | Placement rules for policy targeting |
 
