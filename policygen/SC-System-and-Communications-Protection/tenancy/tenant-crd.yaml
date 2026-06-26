@@ -156,7 +156,7 @@ spec:
                           description: IP address of the upstream BGP peer.
                         vrf:
                           type: string
-                          description: Dedicated VRF name (e.g. starwars-vrf).
+                          description: Dedicated VRF name (e.g. mandalorian-vrf).
                         addresses:
                           type: array
                           description: External IP ranges assigned to this tenant's services.

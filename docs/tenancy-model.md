@@ -89,14 +89,14 @@ flowchart TD
         policy[ACM Policy Engine]
     end
     subgraph managed [Managed Cluster]
-        subgraph tenantA ["Namespace: starwars"]
+        subgraph tenantA ["Namespace: mandalorian"]
             vmA[VMs]
             quotaA["RQ + AAQ + LimitRange"]
             udnA["UDN A\n(primary isolated network)"]
             rbacA["MCRA RoleBindings\n(tenant-ns:* + kubevirt.io:*)"]
             metallbA["MetalLB BGP\n(VRF + BGPPeer + IPPool)"]
         end
-        subgraph tenantB ["Namespace: startrek"]
+        subgraph tenantB ["Namespace: deepspacenine"]
             vmB[VMs]
             quotaB["RQ + AAQ + LimitRange"]
             udnB["UDN B\n(primary isolated network)"]
@@ -175,7 +175,7 @@ The tenant group **never needs a kubeconfig or direct API access** to the manage
 
 ```mermaid
 sequenceDiagram
-    participant user as "Tenant User\n(IdP group: starwars-tenant-admin)"
+    participant user as "Tenant User\n(IdP group: mandalorian-tenant-admin)"
     participant acm as "ACM Hub Console"
     participant hub as "Hub RBAC\n(ClusterRoleBinding)"
     participant mcra as "MulticlusterRoleAssignment\n(hub → managed)"
@@ -183,8 +183,8 @@ sequenceDiagram
 
     user->>acm: Login via SSO
     acm->>hub: Verify acm-vm-fleet:view membership
-    hub-->>acm: Authorised — show starwars fleet
-    acm->>mcra: Resolve effective permissions for starwars namespace
+    hub-->>acm: Authorised — show mandalorian fleet
+    acm->>mcra: Resolve effective permissions for mandalorian namespace
     mcra-->>acm: tenant-ns:admin + kubevirt.io:admin + acm-vm-extended:admin on managed clusters
     user->>acm: Open VM console
     acm->>kv: Proxy VNC/serial (authorised by kubevirt.io:admin RoleBinding)

@@ -17,10 +17,10 @@ Fill in the table below before creating the Tenant CR. All fields except `adminG
 
 | Parameter          | Description                                                                                                       | Example              |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------- | -------------------- |
-| **Tenant name**    | Namespace name on managed clusters, used as prefix everywhere                                                     | `starwars`           |
-| **Tenant-Admin group**    | IdP group granted `admin` in the namespace + `kubevirt.io:admin` on VMs + `acm-vm-fleet:view` on the hub console  | `starwars-tenant-admin`  |
-| **Tenant-User group**     | IdP group granted `edit` in the namespace + `kubevirt.io:edit` on VMs + `acm-vm-fleet:view` on the hub console    | `starwars-tenant-user`   |
-| **Tenant-Viewer group**   | IdP group granted `view` in the namespace + `kubevirt.io:view` on VMs + `acm-vm-fleet:view` on the hub console    | `starwars-tenant-viewer` |
+| **Tenant name**    | Namespace name on managed clusters, used as prefix everywhere                                                     | `mandalorian`           |
+| **Tenant-Admin group**    | IdP group granted `admin` in the namespace + `kubevirt.io:admin` on VMs + `acm-vm-fleet:view` on the hub console  | `mandalorian-tenant-admin`  |
+| **Tenant-User group**     | IdP group granted `edit` in the namespace + `kubevirt.io:edit` on VMs + `acm-vm-fleet:view` on the hub console    | `mandalorian-tenant-user`   |
+| **Tenant-Viewer group**   | IdP group granted `view` in the namespace + `kubevirt.io:view` on VMs + `acm-vm-fleet:view` on the hub console    | `mandalorian-tenant-viewer` |
 
 
 Roles are fixed per group tier:
@@ -119,7 +119,7 @@ Each tenant can get its own MetalLB BGP peering session in a dedicated VRF for i
 | ---------------- | --------------------------- | ------------------------------------------------------------------------- |
 | **Peer ASN**     | `network.metallb.peerASN`   | ASN of the upstream router for this tenant                                |
 | **Peer address** | `network.metallb.peerAddress`| IP address of the upstream BGP peer                                      |
-| **VRF name**     | `network.metallb.vrf`       | Dedicated VRF name (e.g. `starwars-vrf`)                                  |
+| **VRF name**     | `network.metallb.vrf`       | Dedicated VRF name (e.g. `mandalorian-vrf`)                                  |
 | **Local ASN**    | `network.metallb.myASN`     | Cluster-side ASN (default `64500`, shared across tenants)                 |
 | **IP pool**      | `network.metallb.addresses` | CIDR or range of external IPs assigned to this tenant's services          |
 
@@ -145,7 +145,7 @@ spec:
   viewerGroup: TENANT-tenant-viewer
 ```
 
-Full example with all fields: see [`examples/tenant-starwars.yaml`](../examples/tenant-starwars.yaml).
+Full example with all fields: see [`tenancies/tenant-mandalorian.yaml`](../tenancies/tenant-mandalorian.yaml).
 
 You can create the CR via the CLI or by pasting YAML directly into the OpenShift console (Home > Search > `Tenant`).
 

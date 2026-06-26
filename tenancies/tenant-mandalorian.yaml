@@ -2,14 +2,14 @@
 apiVersion: dusty-seahorse.io/v1alpha1
 kind: Tenant
 metadata:
-  name: starwars
+  name: mandalorian
   namespace: tenancies
 spec:
-  displayName: "Star Wars"
+  displayName: "The Mandalorian"
   owner: platform-team@example.com
-  adminGroup: starwars-tenant-admin
-  userGroup: starwars-tenant-user
-  viewerGroup: starwars-tenant-viewer
+  adminGroup: mandalorian-tenant-admin
+  userGroup: mandalorian-tenant-user
+  viewerGroup: mandalorian-tenant-viewer
 
   resourceQuota:
     cpu: "86"
@@ -32,6 +32,6 @@ spec:
       myASN: 64500
       peerASN: 64501
       peerAddress: "192.168.1.1"
-      vrf: starwars-vrf
+      vrf: mandalorian-vrf
       addresses:
         - "192.168.11.0/24"
