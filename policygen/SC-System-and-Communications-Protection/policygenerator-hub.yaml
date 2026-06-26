@@ -30,6 +30,7 @@ policies:
       - path: tenancy/tenancies-namespace.yaml
 
   - name: tenancy-hub-keycloak-realms
+    remediationAction: inform
     controls:
       - Provision Tenant Keycloak Realms
     dependencies:
