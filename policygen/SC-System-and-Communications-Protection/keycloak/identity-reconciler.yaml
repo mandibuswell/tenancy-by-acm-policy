@@ -1,0 +1,179 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tenant-identity-reconciler
+  namespace: tenancies
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-identity-reconciler
+rules:
+  - apiGroups: ["config.openshift.io"]
+    resources: ["oauths"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["dusty-seahorse.io"]
+    resources: ["tenants"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["dusty-seahorse.io"]
+    resources: ["tenants/status"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tenant-identity-reconciler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tenant-identity-reconciler
+subjects:
+  - kind: ServiceAccount
+    name: tenant-identity-reconciler
+    namespace: tenancies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-identity-reconciler-script
+  namespace: tenancies
+data:
+  reconcile.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shopt -s expand_aliases
+    alias oc='oc --insecure-skip-tls-verify=true'
+
+    patch_status() {
+      local ns=$1 name=$2 payload=$3
+      oc patch tenant "$name" -n "$ns" --subresource=status --type=merge -p "$payload" 2>/dev/null || true
+    }
+
+    DOMAIN=$(oc get ingresses.config cluster -o jsonpath='{.spec.domain}')
+    OAUTH_JSON=$(oc get oauth cluster -o json)
+
+    oc get tenants.dusty-seahorse.io -n tenancies -o json | jq -c '.items[]' | while read -r tenant; do
+      NAME=$(echo "$tenant" | jq -r '.metadata.name')
+      NS=$(echo "$tenant" | jq -r '.metadata.namespace')
+      IDENTITY=$(echo "$tenant" | jq -c '.spec.identity // empty')
+      if [ -z "$IDENTITY" ] || [ "$(echo "$IDENTITY" | jq -r '.enabled // false')" != "true" ]; then
+        continue
+      fi
+
+      PROVIDER=$(echo "$IDENTITY" | jq -r '.provider // "keycloak"')
+      IDP_NAME=$(echo "$IDENTITY" | jq -r ".consoleLoginName // \"${NAME}-idp\"")
+      CLIENT_ID=$(echo "$IDENTITY" | jq -r ".clientId // \"openshift-${NAME}\"")
+      SECRET_NS=$(echo "$IDENTITY" | jq -r '.clientSecretRef.namespace // "openshift-config"')
+      SECRET_NAME=$(echo "$IDENTITY" | jq -r ".clientSecretRef.name // \"${NAME}-client-secret\"")
+      CALLBACK="https://oauth-openshift.${DOMAIN}/oauth2callback/${IDP_NAME}"
+
+      if ! oc get secret "$SECRET_NAME" -n "$SECRET_NS" &>/dev/null; then
+        patch_status "$NS" "$NAME" "{\"status\":{\"identity\":{\"phase\":\"Error\",\"idpName\":\"${IDP_NAME}\",\"message\":\"Client secret ${SECRET_NS}/${SECRET_NAME} not found\"}}}"
+        continue
+      fi
+
+      ISSUER=""
+      NOTES="[]"
+      if [ "$PROVIDER" = "keycloak" ]; then
+        KC_NS=$(echo "$IDENTITY" | jq -r '.keycloak.namespace // "keycloak-system"')
+        REALM=$(echo "$IDENTITY" | jq -r ".keycloak.realm // \"${NAME}\"")
+        KC_HOST=$(oc get route keycloak -n "$KC_NS" -o jsonpath='{.spec.host}' 2>/dev/null || true)
+        if [ -z "$KC_HOST" ]; then
+          patch_status "$NS" "$NAME" "{\"status\":{\"identity\":{\"phase\":\"Error\",\"idpName\":\"${IDP_NAME}\",\"message\":\"Keycloak route not found in ${KC_NS}\"}}}"
+          continue
+        fi
+        ISSUER="https://${KC_HOST}/realms/${REALM}"
+      else
+        ISSUER=$(echo "$IDENTITY" | jq -r '.oidc.issuer // ""')
+        if [ -z "$ISSUER" ]; then
+          patch_status "$NS" "$NAME" "{\"status\":{\"identity\":{\"phase\":\"Error\",\"idpName\":\"${IDP_NAME}\",\"message\":\"spec.identity.oidc.issuer is required for provider oidc\"}}}"
+          continue
+        fi
+        NOTES=$(jq -nc --arg cb "$CALLBACK" --arg cid "$CLIENT_ID" --arg iss "$ISSUER" --arg ag "$(echo "$tenant" | jq -r '.spec.adminGroup')" \
+          '[
+            "Register redirect URI: " + $cb,
+            "Create OIDC client with ID: " + $cid,
+            "Set issuer to: " + $iss,
+            "Map groups claim to tenant groups (e.g. " + $ag + ")"
+          ]')
+      fi
+
+      EXISTS=$(echo "$OAUTH_JSON" | jq -r --arg n "$IDP_NAME" '[.spec.identityProviders[]? | select(.name == $n)] | length')
+      if [ "$EXISTS" = "0" ]; then
+        CLAIMS='{"preferredUsername":["preferred_username"],"name":["name"],"email":["email"],"groups":["groups"]}'
+        if [ "$PROVIDER" = "oidc" ]; then
+          G=$(echo "$IDENTITY" | jq -r '.oidc.claims.groups // "groups"')
+          U=$(echo "$IDENTITY" | jq -r '.oidc.claims.preferredUsername // "preferred_username"')
+          N=$(echo "$IDENTITY" | jq -r '.oidc.claims.name // "name"')
+          E=$(echo "$IDENTITY" | jq -r '.oidc.claims.email // "email"')
+          CLAIMS=$(jq -nc --arg g "$G" --arg u "$U" --arg n "$N" --arg e "$E" \
+            '{preferredUsername:[$u],name:[$n],email:[$e],groups:[$g]}')
+        fi
+        PATCH=$(jq -nc \
+          --arg name "$IDP_NAME" \
+          --arg cid "$CLIENT_ID" \
+          --arg sname "$SECRET_NAME" \
+          --arg issuer "$ISSUER" \
+          --argjson claims "$CLAIMS" \
+          '[{op:"add",path:"/spec/identityProviders/-",value:{
+            name:$name,mappingMethod:"claim",type:"OpenID",
+            openID:{clientID:$cid,clientSecret:{name:$sname},claims:$claims,issuer:$issuer}
+          }}]')
+        if ! oc patch oauth cluster --type=json -p "$PATCH"; then
+          patch_status "$NS" "$NAME" "{\"status\":{\"identity\":{\"phase\":\"Error\",\"idpName\":\"${IDP_NAME}\",\"message\":\"Failed to patch oauth/cluster\"}}}"
+          continue
+        fi
+        OAUTH_JSON=$(oc get oauth cluster -o json)
+      fi
+
+      PHASE="Ready"
+      if [ "$PROVIDER" = "oidc" ]; then
+        PHASE="PendingExternalSetup"
+      fi
+      STATUS=$(jq -nc \
+        --arg phase "$PHASE" \
+        --arg idp "$IDP_NAME" \
+        --arg cb "$CALLBACK" \
+        --arg iss "$ISSUER" \
+        --arg cid "$CLIENT_ID" \
+        --argjson notes "$NOTES" \
+        '{status:{identity:{phase:$phase,idpName:$idp,callbackURL:$cb,issuer:$iss,clientId:$cid,externalSetupNotes:$notes,message:"OpenShift IdP registered"}}}')
+      patch_status "$NS" "$NAME" "$STATUS"
+      echo "Reconciled tenant ${NAME} IdP ${IDP_NAME} (${PHASE})"
+    done
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tenant-identity-reconciler
+  namespace: tenancies
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: tenant-identity-reconciler
+          restartPolicy: OnFailure
+          containers:
+            - name: reconcile
+              image: quay.io/openshift/origin-cli:4.14
+              command: ["/bin/bash", "/scripts/reconcile.sh"]
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+          volumes:
+            - name: scripts
+              configMap:
+                name: tenant-identity-reconciler-script
+                defaultMode: 0755

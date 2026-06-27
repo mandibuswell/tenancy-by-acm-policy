@@ -37,6 +37,14 @@ policies:
     manifests:
       - path: keycloak/realm-import-from-crd.yaml
 
+  - name: tenancy-hub-identity-reconciler
+    controls:
+      - Register Tenant OpenShift OAuth IdPs
+    dependencies:
+      - name: tenancy-hub-tenant-crd
+    manifests:
+      - path: keycloak/identity-reconciler.yaml
+
 policySets:
   - name: tenancy-hub-tenant-definition
     description: "Hub Tenant CRD and tenancies namespace -- foundation for all tenant policies"

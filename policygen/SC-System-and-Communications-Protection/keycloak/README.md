@@ -4,6 +4,24 @@ The `tenancy-hub-keycloak-realms` policy (hub only) creates a `KeycloakRealmImpo
 for every `Tenant` CR in the `tenancies` namespace. The template lives in
 `realm-import-from-crd.yaml` and is evaluated at policy sync time using `lookup`.
 
+## Opt-in console SSO (`spec.identity`)
+
+Tenants **without** `spec.identity` continue to receive Keycloak realm imports (legacy
+demo behaviour). New tenants should set `spec.identity.enabled: true` to opt in to
+full console SSO automation:
+
+| `provider` | Policy behaviour | IdP registration |
+|------------|------------------|------------------|
+| `keycloak` | `KeycloakRealmImport` on chosen Keycloak CR | CronJob adds `{tenant}-idp` to `oauth/cluster` |
+| `oidc` | No realm import | CronJob registers IdP; `status.identity` lists external setup notes |
+
+Required fields when enabled:
+
+- `clientSecretRef` — Secret in `openshift-config` (create via form or CLI; never store the value on the CR)
+- `keycloak.namespace` / `keycloak.instanceName` — which Keycloak CR to use (demo default: `keycloak-system/main`)
+
+See [`examples/tenant-gigashadow-identity.yaml`](../../../examples/tenant-gigashadow-identity.yaml).
+
 ## Seed users
 
 Each tenant realm is bootstrapped with three default users. Usernames use an

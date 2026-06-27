@@ -1,21 +1,50 @@
 object-templates-raw: |
   {{- range $tenant := (lookup "dusty-seahorse.io/v1alpha1" "Tenant" "tenancies" "").items }}
   {{- $name := $tenant.metadata.name }}
+  {{- $identity := $tenant.spec.identity }}
+  {{- $manageKeycloak := false }}
+  {{- if not $identity }}
+  {{- $manageKeycloak = true }}
+  {{- else if and $identity.enabled (eq ($identity.provider | default "keycloak") "keycloak") }}
+  {{- $manageKeycloak = true }}
+  {{- end }}
+  {{- if not $manageKeycloak }}{{- else }}
   {{- $domain := (lookup "config.openshift.io/v1" "Ingress" "" "cluster").spec.domain }}
-  {{- $loginTheme := $name }}
-  {{- if eq $name "battlestar" }}{{ $loginTheme = "bsg" }}{{ end }}
+  {{- $kcNs := "keycloak-system" }}
+  {{- $kcCr := "main" }}
+  {{- $realm := $name }}
+  {{- $seedUsers := true }}
+  {{- if $identity.keycloak }}
+  {{- if $identity.keycloak.namespace }}{{ $kcNs = $identity.keycloak.namespace }}{{- end }}
+  {{- if $identity.keycloak.instanceName }}{{ $kcCr = $identity.keycloak.instanceName }}{{- end }}
+  {{- if $identity.keycloak.realm }}{{ $realm = $identity.keycloak.realm }}{{- end }}
+  {{- if eq $identity.keycloak.seedUsers false }}{{ $seedUsers = false }}{{- end }}
+  {{- end }}
+  {{- $loginTheme := $realm }}
+  {{- if eq $realm "battlestar" }}{{ $loginTheme = "bsg" }}{{ end }}
+  {{- $secretNs := "openshift-config" }}
+  {{- $secretName := printf "%s-client-secret" $name }}
+  {{- if and $identity $identity.clientSecretRef $identity.clientSecretRef.name }}
+  {{- $secretName = $identity.clientSecretRef.name }}
+  {{- if $identity.clientSecretRef.namespace }}{{ $secretNs = $identity.clientSecretRef.namespace }}{{- end }}
+  {{- end }}
+  {{- $clientSecret := "VDRjA2vWjJwlSZQ9tickuGkBQpiiJHdN" }}
+  {{- $secret := lookup "v1" "Secret" $secretNs $secretName }}
+  {{- if $secret }}{{ $clientSecret = ($secret.data.clientSecret | b64dec) }}{{- end }}
+  {{- $idpName := printf "%s-idp" $name }}
+  {{- if and $identity $identity.consoleLoginName }}{{ $idpName = $identity.consoleLoginName }}{{- end }}
   - complianceType: musthave
     objectDefinition:
       apiVersion: k8s.keycloak.org/v2alpha1
       kind: KeycloakRealmImport
       metadata:
         name: {{ $name }}-realm-import
-        namespace: keycloak-system
+        namespace: {{ $kcNs }}
       spec:
-        keycloakCRName: main
+        keycloakCRName: {{ $kcCr }}
         realm:
-          id: {{ $name }}
-          realm: {{ $name }}
+          id: {{ $realm }}
+          realm: {{ $realm }}
           enabled: true
           loginTheme: {{ $loginTheme }}
           groups:
@@ -40,6 +69,7 @@ object-templates-raw: |
               {{- if $tenant.spec.viewerGroup }}
               - name: {{ $tenant.spec.viewerGroup }}
               {{- end }}
+          {{- if $seedUsers }}
           users:
             - username: admin@{{ $name }}.local
               enabled: true
@@ -73,14 +103,15 @@ object-templates-raw: |
                   value: password
                   temporary: false
             {{- end }}
+          {{- end }}
           clients:
-            - clientId: openshift-{{ $name }}
-              secret: VDRjA2vWjJwlSZQ9tickuGkBQpiiJHdN
+            - clientId: {{ if and $identity $identity.clientId }}{{ $identity.clientId }}{{ else }}openshift-{{ $name }}{{ end }}
+              secret: {{ $clientSecret }}
               enabled: true
               directAccessGrantsEnabled: true
               standardFlowEnabled: true
               redirectUris:
-                - "https://oauth-openshift.{{ $domain }}/oauth2callback/{{ $name }}-idp"
+                - "https://oauth-openshift.{{ $domain }}/oauth2callback/{{ $idpName }}"
                 - "https://console-openshift-console.{{ $domain }}/*"
               protocolMappers:
                 - name: groups
@@ -93,4 +124,5 @@ object-templates-raw: |
                     id.token.claim: "true"
                     access.token.claim: "true"
                     userinfo.token.claim: "true"
+  {{- end }}
   {{- end }}
