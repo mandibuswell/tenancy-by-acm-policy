@@ -49,6 +49,13 @@ data:
     #!/usr/bin/env bash
     set -euo pipefail
     shopt -s expand_aliases
+
+    # In-cluster oc config (service account token)
+    SA=/var/run/secrets/kubernetes.io/serviceaccount
+    oc config set-cluster in-cluster --server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" --certificate-authority="${SA}/ca.crt"
+    oc config set-credentials sa --token="$(cat "${SA}/token")"
+    oc config set-context in-cluster --cluster=in-cluster --user=sa
+    oc config use-context in-cluster
     alias oc='oc --insecure-skip-tls-verify=true'
 
     patch_status() {
