@@ -22,6 +22,10 @@ object-templates-raw: |
   {{- end }}
   {{- $loginTheme := $realm }}
   {{- if eq $realm "battlestar" }}{{ $loginTheme = "bsg" }}{{ end }}
+  {{- if and $identity $identity.enabled }}
+  {{- $loginTheme = "keycloak" }}
+  {{- if and $identity.keycloak $identity.keycloak.loginTheme }}{{ $loginTheme = $identity.keycloak.loginTheme }}{{- end }}
+  {{- end }}
   {{- $secretNs := "openshift-config" }}
   {{- $secretName := printf "%s-client-secret" $name }}
   {{- if and $identity $identity.clientSecretRef $identity.clientSecretRef.name }}
