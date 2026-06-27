@@ -48,15 +48,21 @@ data:
   reconcile.sh: |
     #!/usr/bin/env bash
     set -euo pipefail
-    shopt -s expand_aliases
 
-    # In-cluster oc config (service account token)
     SA=/var/run/secrets/kubernetes.io/serviceaccount
-    oc config set-cluster in-cluster --server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" --certificate-authority="${SA}/ca.crt"
-    oc config set-credentials sa --token="$(cat "${SA}/token")"
-    oc config set-context in-cluster --cluster=in-cluster --user=sa
-    oc config use-context in-cluster
-    alias oc='oc --insecure-skip-tls-verify=true'
+    export KUBECONFIG=/tmp/kubeconfig
+    jq -n \
+      --arg token "$(cat "${SA}/token")" \
+      --arg server "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" \
+      --arg ca "${SA}/ca.crt" \
+      '{
+        apiVersion: "v1",
+        kind: "Config",
+        clusters: [{name: "in-cluster", cluster: {server: $server, "certificate-authority": $ca}}],
+        contexts: [{name: "in-cluster", context: {cluster: "in-cluster", user: "sa"}}],
+        "current-context": "in-cluster",
+        users: [{name: "sa", user: {token: $token}}]
+      }' > "${KUBECONFIG}"
 
     patch_status() {
       local ns=$1 name=$2 payload=$3
@@ -175,7 +181,7 @@ spec:
           containers:
             - name: reconcile
               image: quay.io/openshift/origin-cli:4.14
-              command: ["/bin/bash", "/scripts/reconcile.sh"]
+              command: ["/scripts/reconcile.sh"]
               volumeMounts:
                 - name: scripts
                   mountPath: /scripts
