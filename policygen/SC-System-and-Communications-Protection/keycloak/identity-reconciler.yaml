@@ -11,7 +11,7 @@ metadata:
   name: tenant-identity-reconciler
 rules:
   - apiGroups: ["config.openshift.io"]
-    resources: ["oauths"]
+    resources: ["oauths", "ingresses"]
     verbs: ["get", "patch", "update"]
   - apiGroups: ["dusty-seahorse.io"]
     resources: ["tenants"]
@@ -49,20 +49,16 @@ data:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    SA=/var/run/secrets/kubernetes.io/serviceaccount
-    export KUBECONFIG=/tmp/kubeconfig
-    jq -n \
-      --arg token "$(cat "${SA}/token")" \
-      --arg server "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" \
-      --arg ca "${SA}/ca.crt" \
-      '{
-        apiVersion: "v1",
-        kind: "Config",
-        clusters: [{name: "in-cluster", cluster: {server: $server, "certificate-authority": $ca}}],
-        contexts: [{name: "in-cluster", context: {cluster: "in-cluster", user: "sa"}}],
-        "current-context": "in-cluster",
-        users: [{name: "sa", user: {token: $token}}]
-      }' > "${KUBECONFIG}"
+    if ! command -v jq >/dev/null 2>&1; then
+      case "$(uname -m)" in
+        x86_64) jq_bin=jq-linux-amd64 ;;
+        aarch64|arm64) jq_bin=jq-linux-arm64 ;;
+        *) echo "unsupported architecture for jq bootstrap: $(uname -m)" >&2; exit 1 ;;
+      esac
+      curl -fsSL -o /tmp/jq "https://github.com/jqlang/jq/releases/download/jq-1.7.1/${jq_bin}"
+      chmod +x /tmp/jq
+      export PATH="/tmp:${PATH}"
+    fi
 
     patch_status() {
       local ns=$1 name=$2 payload=$3
