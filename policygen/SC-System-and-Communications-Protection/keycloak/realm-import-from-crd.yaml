@@ -3,9 +3,7 @@ object-templates-raw: |
   {{- $name := $tenant.metadata.name }}
   {{- $identity := $tenant.spec.identity }}
   {{- $manageKeycloak := false }}
-  {{- if not $identity }}
-  {{- $manageKeycloak = true }}
-  {{- else if and $identity.enabled (eq ($identity.provider | default "keycloak") "keycloak") }}
+  {{- if and $identity $identity.enabled (eq ($identity.provider | default "keycloak") "keycloak") $identity.keycloak $identity.keycloak.manageRealm }}
   {{- $manageKeycloak = true }}
   {{- end }}
   {{- if not $manageKeycloak }}{{- else }}
@@ -13,19 +11,15 @@ object-templates-raw: |
   {{- $kcNs := "keycloak-system" }}
   {{- $kcCr := "main" }}
   {{- $realm := $name }}
-  {{- $seedUsers := true }}
+  {{- $seedUsers := false }}
   {{- if $identity.keycloak }}
   {{- if $identity.keycloak.namespace }}{{ $kcNs = $identity.keycloak.namespace }}{{- end }}
   {{- if $identity.keycloak.instanceName }}{{ $kcCr = $identity.keycloak.instanceName }}{{- end }}
   {{- if $identity.keycloak.realm }}{{ $realm = $identity.keycloak.realm }}{{- end }}
-  {{- if eq $identity.keycloak.seedUsers false }}{{ $seedUsers = false }}{{- end }}
+  {{- if $identity.keycloak.seedUsers }}{{ $seedUsers = true }}{{- end }}
   {{- end }}
-  {{- $loginTheme := $realm }}
-  {{- if eq $realm "battlestar" }}{{ $loginTheme = "bsg" }}{{ end }}
-  {{- if and $identity $identity.enabled }}
-  {{- $loginTheme = "keycloak" }}
+  {{- $loginTheme := "keycloak" }}
   {{- if and $identity.keycloak $identity.keycloak.loginTheme }}{{ $loginTheme = $identity.keycloak.loginTheme }}{{- end }}
-  {{- end }}
   {{- $secretNs := "openshift-config" }}
   {{- $secretName := printf "%s-client-secret" $name }}
   {{- if and $identity $identity.clientSecretRef $identity.clientSecretRef.name }}

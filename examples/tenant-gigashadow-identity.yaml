@@ -43,4 +43,5 @@ spec:
       namespace: keycloak-system
       instanceName: main
       realm: gigashadow
+      manageRealm: true
       seedUsers: true
