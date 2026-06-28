@@ -119,6 +119,6 @@ tokens.
   `KeycloakRealmImport` CRs are removed when the Tenant CR is deleted. The identity reconciler
   CronJob also removes orphan imports, OAuth IdPs (`openshift-{tenant}` clients), and default
   client secrets.
-- **Keycloak DB:** Realm import is additive — the RHBK Operator does not remove groups, roles,
-  or users from the database when the import CR is deleted. Use the Keycloak Admin API for
-  strict DB cleanup if required.
+- **Keycloak DB:** RHBK is additive — deleting `KeycloakRealmImport` does not remove the realm
+  from the database. The identity reconciler now sweeps orphan DB realms (no matching Tenant CR
+  and no import CR) via the Keycloak Admin API after each run.

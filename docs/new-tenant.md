@@ -222,7 +222,7 @@ On the next policy / reconciler cycle:
 
 **Custom identity fields:** IdP/secret cleanup assumes default naming (`openshift-{tenant}` client, `{tenant}-client-secret`). Tenants with custom `clientId` or `clientSecretRef.name` may need manual OAuth/secret cleanup after delete.
 
-**Keycloak DB:** Deleting `KeycloakRealmImport` removes the CR; stale realm data in the Keycloak database may linger (RHBK is additive). Use the Keycloak admin API for strict DB cleanup if required.
+**Keycloak DB:** Deleting `KeycloakRealmImport` removes the CR only; RHBK does not drop the realm from the database. The identity reconciler CronJob deletes orphan DB realms (no Tenant CR and no import CR) via the Keycloak Admin API on each run.
 
 **Legacy theme-only tenants** (no `spec.identity`, created via `apply-themes.sh -r`): deleting the Tenant CR triggers policy realm-import prune; OAuth IdP cleanup uses the same `openshift-{tenant}` rule when the Tenant CR is gone.
 

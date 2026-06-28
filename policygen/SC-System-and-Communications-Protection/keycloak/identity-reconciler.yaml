@@ -68,6 +68,37 @@ data:
       oc patch tenant "$name" -n "$ns" --subresource=status --type=merge -p "$payload" 2>/dev/null || true
     }
 
+    KEYCLOAK_SYSTEM_NS="${KEYCLOAK_SYSTEM_NS:-keycloak-system}"
+
+    keycloak_admin_token() {
+      local kc_ns=$1 user pass host response
+      kc_ns="${kc_ns:-$KEYCLOAK_SYSTEM_NS}"
+      user=$(oc get secret keycloak-db-secret -n "$kc_ns" -o jsonpath='{.data.username}' 2>/dev/null | base64 -d)
+      pass=$(oc get secret keycloak-db-secret -n "$kc_ns" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d)
+      host=$(oc get route keycloak -n "$kc_ns" -o jsonpath='{.spec.host}' 2>/dev/null)
+      [ -z "$user" ] || [ -z "$pass" ] || [ -z "$host" ] && return 1
+      response=$(curl -sk -X POST "https://${host}/realms/master/protocol/openid-connect/token" \
+        -d "client_id=admin-cli" -d "username=${user}" -d "password=${pass}" -d "grant_type=password")
+      echo "$response" | jq -r '.access_token // empty'
+    }
+
+    delete_keycloak_db_realm() {
+      local realm=$1 kc_ns=$2 token host code
+      kc_ns="${kc_ns:-$KEYCLOAK_SYSTEM_NS}"
+      [ "$realm" = "master" ] && return 0
+      host=$(oc get route keycloak -n "$kc_ns" -o jsonpath='{.spec.host}' 2>/dev/null)
+      token=$(keycloak_admin_token "$kc_ns" || true)
+      if [ -z "$token" ] || [ -z "$host" ]; then
+        echo "Could not reach Keycloak admin API; skipping DB delete for realm ${realm}"
+        return 0
+      fi
+      code=$(curl -sk -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $token" "https://${host}/admin/realms/${realm}")
+      if [ "$code" = "200" ]; then
+        echo "Deleting stale Keycloak DB realm: ${realm}"
+        curl -sk -o /dev/null -X DELETE -H "Authorization: Bearer $token" "https://${host}/admin/realms/${realm}"
+      fi
+    }
+
     # Remove OpenShift OAuth IdPs and client secrets for tenants whose CR was deleted.
     # Matches IdPs created by this reconciler (openID clientID openshift-{tenant}).
     cleanup_orphan_identity_providers() {
@@ -91,6 +122,7 @@ data:
                 echo "Deleting orphan secret openshift-config/${tenant}-client-secret"
                 oc delete secret "${tenant}-client-secret" -n openshift-config
               fi
+              delete_keycloak_db_realm "$tenant"
             fi
           fi
         fi
@@ -113,8 +145,35 @@ data:
         if ! oc get tenant "$tenant" -n tenancies &>/dev/null; then
           echo "Deleting orphan KeycloakRealmImport ${ns}/${name}"
           oc delete keycloakrealmimport "$name" -n "$ns" --ignore-not-found
+          delete_keycloak_db_realm "$tenant" "$ns"
         fi
       done < <(oc get keycloakrealmimport -A -o json 2>/dev/null | jq -c '.items[]?')
+    }
+
+    # RHBK does not remove realms from the database when the import CR is pruned.
+    cleanup_orphan_keycloak_db_realms() {
+      local kc_ns token host realms_json realm tenant_names import_names
+      kc_ns="$KEYCLOAK_SYSTEM_NS"
+      host=$(oc get route keycloak -n "$kc_ns" -o jsonpath='{.spec.host}' 2>/dev/null || true)
+      token=$(keycloak_admin_token "$kc_ns" || true)
+      if [ -z "$host" ] || [ -z "$token" ]; then
+        echo "Skipping Keycloak DB realm sweep (admin API unavailable)"
+        return 0
+      fi
+      tenant_names=$(oc get tenants.dusty-seahorse.io -n tenancies -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+      import_names=$(oc get keycloakrealmimport -A -o json 2>/dev/null | jq -r '.items[]? | .metadata.name' || true)
+      realms_json=$(curl -sk -H "Authorization: Bearer $token" "https://${host}/admin/realms")
+      echo "$realms_json" | jq -c '.[]?' | while read -r entry; do
+        realm=$(echo "$entry" | jq -r '.realm // empty')
+        [ -z "$realm" ] || [ "$realm" = "master" ] && continue
+        if echo "$tenant_names" | grep -qx "$realm"; then
+          continue
+        fi
+        if echo "$import_names" | grep -qx "${realm}-realm-import"; then
+          continue
+        fi
+        delete_keycloak_db_realm "$realm" "$kc_ns"
+      done
     }
 
     DOMAIN=$(oc get ingresses.config cluster -o jsonpath='{.spec.domain}')
@@ -212,6 +271,7 @@ data:
 
     cleanup_orphan_identity_providers
     cleanup_orphan_realm_imports
+    cleanup_orphan_keycloak_db_realms
 ---
 apiVersion: batch/v1
 kind: CronJob
