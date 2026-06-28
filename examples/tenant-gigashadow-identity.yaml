@@ -1,0 +1,47 @@
+---
+# Example tenant with opt-in console SSO (Keycloak).
+# Apply after creating the client secret:
+#   oc create secret generic gigashadow-client-secret -n openshift-config \
+#     --from-literal=clientSecret=VDRjA2vWjJwlSZQ9tickuGkBQpiiJHdN
+apiVersion: dusty-seahorse.io/v1alpha1
+kind: Tenant
+metadata:
+  name: gigashadow
+  namespace: tenancies
+spec:
+  displayName: "Gigashadow"
+  owner: platform-team@example.com
+  adminGroup: gigashadow-tenant-admin
+  userGroup: gigashadow-tenant-user
+  viewerGroup: gigashadow-tenant-viewer
+  resourceQuota:
+    cpu: "86"
+    memory: "332Gi"
+    pods: "15"
+    storage: "2000Gi"
+  vmQuota:
+    cpu: "80"
+    memory: "320Gi"
+  limitRange:
+    maxCpu: "32"
+    maxMemory: "128Gi"
+    maxStorage: "1Ti"
+  network:
+    udnSubnet: "10.128.0.0/16"
+    metallb:
+      myASN: 64500
+      vrf: gigashadow-vrf
+  identity:
+    enabled: true
+    provider: keycloak
+    consoleLoginName: gigashadow-idp
+    clientId: openshift-gigashadow
+    clientSecretRef:
+      name: gigashadow-client-secret
+      namespace: openshift-config
+    keycloak:
+      namespace: keycloak-system
+      instanceName: main
+      realm: gigashadow
+      manageRealm: true
+      seedUsers: true

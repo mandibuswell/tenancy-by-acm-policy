@@ -31,11 +31,21 @@ policies:
 
   - name: tenancy-hub-keycloak-realms
     controls:
-      - Provision Tenant Keycloak Realms
+      - Provision Tenant Keycloak Realms (opt-in manageRealm only)
+    dependencies:
+      - name: tenancy-hub-tenant-crd
+    # Remove KeycloakRealmImport CRs when the Tenant CR is deleted.
+    pruneObjectBehavior: DeleteAll
+    manifests:
+      - path: keycloak/realm-import-from-crd.yaml
+
+  - name: tenancy-hub-identity-reconciler
+    controls:
+      - Register Tenant OpenShift OAuth IdPs
     dependencies:
       - name: tenancy-hub-tenant-crd
     manifests:
-      - path: keycloak/realm-import-from-crd.yaml
+      - path: keycloak/identity-reconciler.yaml
 
 policySets:
   - name: tenancy-hub-tenant-definition

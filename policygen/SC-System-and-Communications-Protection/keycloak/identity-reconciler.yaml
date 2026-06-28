@@ -1,0 +1,243 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tenant-identity-reconciler
+  namespace: tenancies
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-identity-reconciler
+rules:
+  - apiGroups: ["config.openshift.io"]
+    resources: ["oauths", "ingresses"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["dusty-seahorse.io"]
+    resources: ["tenants"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["dusty-seahorse.io"]
+    resources: ["tenants/status"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get", "list"]
+  - apiGroups: ["k8s.keycloak.org"]
+    resources: ["keycloakrealmimports"]
+    verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tenant-identity-reconciler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tenant-identity-reconciler
+subjects:
+  - kind: ServiceAccount
+    name: tenant-identity-reconciler
+    namespace: tenancies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-identity-reconciler-script
+  namespace: tenancies
+data:
+  reconcile.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if ! command -v jq >/dev/null 2>&1; then
+      case "$(uname -m)" in
+        x86_64) jq_bin=jq-linux-amd64 ;;
+        aarch64|arm64) jq_bin=jq-linux-arm64 ;;
+        *) echo "unsupported architecture for jq bootstrap: $(uname -m)" >&2; exit 1 ;;
+      esac
+      curl -fsSL -o /tmp/jq "https://github.com/jqlang/jq/releases/download/jq-1.7.1/${jq_bin}"
+      chmod +x /tmp/jq
+      export PATH="/tmp:${PATH}"
+    fi
+
+    patch_status() {
+      local ns=$1 name=$2 payload=$3
+      oc patch tenant "$name" -n "$ns" --subresource=status --type=merge -p "$payload" 2>/dev/null || true
+    }
+
+    # Remove OpenShift OAuth IdPs and client secrets for tenants whose CR was deleted.
+    # Matches IdPs created by this reconciler (openID clientID openshift-{tenant}).
+    cleanup_orphan_identity_providers() {
+      local oauth_json tenant_names count idx cid idp_name tenant removed
+      oauth_json=$(oc get oauth cluster -o json)
+      tenant_names=$(oc get tenants.dusty-seahorse.io -n tenancies -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+      count=$(echo "$oauth_json" | jq '.spec.identityProviders | length')
+      removed=0
+      idx=$((count - 1))
+      while [ "$idx" -ge 0 ]; do
+        cid=$(echo "$oauth_json" | jq -r ".spec.identityProviders[$idx].openID.clientID // empty")
+        idp_name=$(echo "$oauth_json" | jq -r ".spec.identityProviders[$idx].name // empty")
+        if [ -n "$cid" ] && [[ "$cid" =~ ^openshift-(.+)$ ]]; then
+          tenant="${BASH_REMATCH[1]}"
+          if ! echo "$tenant_names" | grep -qx "$tenant"; then
+            echo "Removing orphan IdP ${idp_name} (client ${cid}, tenant ${tenant} deleted)"
+            if oc patch oauth cluster --type=json -p="[{\"op\":\"remove\",\"path\":\"/spec/identityProviders/${idx}\"}]"; then
+              removed=$((removed + 1))
+              oauth_json=$(oc get oauth cluster -o json)
+              if oc get secret "${tenant}-client-secret" -n openshift-config &>/dev/null; then
+                echo "Deleting orphan secret openshift-config/${tenant}-client-secret"
+                oc delete secret "${tenant}-client-secret" -n openshift-config
+              fi
+            fi
+          fi
+        fi
+        idx=$((idx - 1))
+      done
+      if [ "$removed" -gt 0 ]; then
+        echo "Removed ${removed} orphan identity provider(s)"
+      fi
+    }
+
+    # Fallback if policy prune lags: delete realm imports whose tenant CR is gone.
+    cleanup_orphan_realm_imports() {
+      while read -r import; do
+        name=$(echo "$import" | jq -r '.metadata.name')
+        ns=$(echo "$import" | jq -r '.metadata.namespace')
+        tenant="${name%-realm-import}"
+        if [ "$tenant" = "$name" ]; then
+          continue
+        fi
+        if ! oc get tenant "$tenant" -n tenancies &>/dev/null; then
+          echo "Deleting orphan KeycloakRealmImport ${ns}/${name}"
+          oc delete keycloakrealmimport "$name" -n "$ns" --ignore-not-found
+        fi
+      done < <(oc get keycloakrealmimport -A -o json 2>/dev/null | jq -c '.items[]?')
+    }
+
+    DOMAIN=$(oc get ingresses.config cluster -o jsonpath='{.spec.domain}')
+    OAUTH_JSON=$(oc get oauth cluster -o json)
+
+    oc get tenants.dusty-seahorse.io -n tenancies -o json | jq -c '.items[]' | while read -r tenant; do
+      NAME=$(echo "$tenant" | jq -r '.metadata.name')
+      NS=$(echo "$tenant" | jq -r '.metadata.namespace')
+      IDENTITY=$(echo "$tenant" | jq -c '.spec.identity // empty')
+      if [ -z "$IDENTITY" ] || [ "$(echo "$IDENTITY" | jq -r '.enabled // false')" != "true" ]; then
+        continue
+      fi
+
+      PROVIDER=$(echo "$IDENTITY" | jq -r '.provider // "keycloak"')
+      IDP_NAME=$(echo "$IDENTITY" | jq -r ".consoleLoginName // \"${NAME}-idp\"")
+      CLIENT_ID=$(echo "$IDENTITY" | jq -r ".clientId // \"openshift-${NAME}\"")
+      SECRET_NS=$(echo "$IDENTITY" | jq -r '.clientSecretRef.namespace // "openshift-config"')
+      SECRET_NAME=$(echo "$IDENTITY" | jq -r ".clientSecretRef.name // \"${NAME}-client-secret\"")
+      CALLBACK="https://oauth-openshift.${DOMAIN}/oauth2callback/${IDP_NAME}"
+
+      if ! oc get secret "$SECRET_NAME" -n "$SECRET_NS" &>/dev/null; then
+        patch_status "$NS" "$NAME" "{\"status\":{\"identity\":{\"phase\":\"Error\",\"idpName\":\"${IDP_NAME}\",\"message\":\"Client secret ${SECRET_NS}/${SECRET_NAME} not found\"}}}"
+        continue
+      fi
+
+      ISSUER=""
+      NOTES="[]"
+      if [ "$PROVIDER" = "keycloak" ]; then
+        KC_NS=$(echo "$IDENTITY" | jq -r '.keycloak.namespace // "keycloak-system"')
+        REALM=$(echo "$IDENTITY" | jq -r ".keycloak.realm // \"${NAME}\"")
+        KC_HOST=$(oc get route keycloak -n "$KC_NS" -o jsonpath='{.spec.host}' 2>/dev/null || true)
+        if [ -z "$KC_HOST" ]; then
+          patch_status "$NS" "$NAME" "{\"status\":{\"identity\":{\"phase\":\"Error\",\"idpName\":\"${IDP_NAME}\",\"message\":\"Keycloak route not found in ${KC_NS}\"}}}"
+          continue
+        fi
+        ISSUER="https://${KC_HOST}/realms/${REALM}"
+      else
+        ISSUER=$(echo "$IDENTITY" | jq -r '.oidc.issuer // ""')
+        if [ -z "$ISSUER" ]; then
+          patch_status "$NS" "$NAME" "{\"status\":{\"identity\":{\"phase\":\"Error\",\"idpName\":\"${IDP_NAME}\",\"message\":\"spec.identity.oidc.issuer is required for provider oidc\"}}}"
+          continue
+        fi
+        NOTES=$(jq -nc --arg cb "$CALLBACK" --arg cid "$CLIENT_ID" --arg iss "$ISSUER" --arg ag "$(echo "$tenant" | jq -r '.spec.adminGroup')" \
+          '[
+            "Register redirect URI: " + $cb,
+            "Create OIDC client with ID: " + $cid,
+            "Set issuer to: " + $iss,
+            "Map groups claim to tenant groups (e.g. " + $ag + ")"
+          ]')
+      fi
+
+      EXISTS=$(echo "$OAUTH_JSON" | jq -r --arg n "$IDP_NAME" '[.spec.identityProviders[]? | select(.name == $n)] | length')
+      if [ "$EXISTS" = "0" ]; then
+        CLAIMS='{"preferredUsername":["preferred_username"],"name":["name"],"email":["email"],"groups":["groups"]}'
+        if [ "$PROVIDER" = "oidc" ]; then
+          G=$(echo "$IDENTITY" | jq -r '.oidc.claims.groups // "groups"')
+          U=$(echo "$IDENTITY" | jq -r '.oidc.claims.preferredUsername // "preferred_username"')
+          N=$(echo "$IDENTITY" | jq -r '.oidc.claims.name // "name"')
+          E=$(echo "$IDENTITY" | jq -r '.oidc.claims.email // "email"')
+          CLAIMS=$(jq -nc --arg g "$G" --arg u "$U" --arg n "$N" --arg e "$E" \
+            '{preferredUsername:[$u],name:[$n],email:[$e],groups:[$g]}')
+        fi
+        PATCH=$(jq -nc \
+          --arg name "$IDP_NAME" \
+          --arg cid "$CLIENT_ID" \
+          --arg sname "$SECRET_NAME" \
+          --arg issuer "$ISSUER" \
+          --argjson claims "$CLAIMS" \
+          '[{op:"add",path:"/spec/identityProviders/-",value:{
+            name:$name,mappingMethod:"claim",type:"OpenID",
+            openID:{clientID:$cid,clientSecret:{name:$sname},claims:$claims,issuer:$issuer}
+          }}]')
+        if ! oc patch oauth cluster --type=json -p "$PATCH"; then
+          patch_status "$NS" "$NAME" "{\"status\":{\"identity\":{\"phase\":\"Error\",\"idpName\":\"${IDP_NAME}\",\"message\":\"Failed to patch oauth/cluster\"}}}"
+          continue
+        fi
+        OAUTH_JSON=$(oc get oauth cluster -o json)
+      fi
+
+      PHASE="Ready"
+      if [ "$PROVIDER" = "oidc" ]; then
+        PHASE="PendingExternalSetup"
+      fi
+      STATUS=$(jq -nc \
+        --arg phase "$PHASE" \
+        --arg idp "$IDP_NAME" \
+        --arg cb "$CALLBACK" \
+        --arg iss "$ISSUER" \
+        --arg cid "$CLIENT_ID" \
+        --argjson notes "$NOTES" \
+        '{status:{identity:{phase:$phase,idpName:$idp,callbackURL:$cb,issuer:$iss,clientId:$cid,externalSetupNotes:$notes,message:"OpenShift IdP registered"}}}')
+      patch_status "$NS" "$NAME" "$STATUS"
+      echo "Reconciled tenant ${NAME} IdP ${IDP_NAME} (${PHASE})"
+    done
+
+    cleanup_orphan_identity_providers
+    cleanup_orphan_realm_imports
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tenant-identity-reconciler
+  namespace: tenancies
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: tenant-identity-reconciler
+          restartPolicy: OnFailure
+          containers:
+            - name: reconcile
+              image: quay.io/openshift/origin-cli:4.14
+              command: ["/scripts/reconcile.sh"]
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+          volumes:
+            - name: scripts
+              configMap:
+                name: tenant-identity-reconciler-script
+                defaultMode: 0755

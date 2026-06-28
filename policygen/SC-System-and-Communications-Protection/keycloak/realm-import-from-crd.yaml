@@ -1,28 +1,64 @@
 object-templates-raw: |
   {{- range $tenant := (lookup "dusty-seahorse.io/v1alpha1" "Tenant" "tenancies" "").items }}
   {{- $name := $tenant.metadata.name }}
+  {{- $identity := $tenant.spec.identity }}
+  {{- $manageKeycloak := false }}
+  {{- if and $identity $identity.enabled (eq ($identity.provider | default "keycloak") "keycloak") $identity.keycloak $identity.keycloak.manageRealm }}
+  {{- $manageKeycloak = true }}
+  {{- end }}
+  {{- if not $manageKeycloak }}{{- else }}
   {{- $domain := (lookup "config.openshift.io/v1" "Ingress" "" "cluster").spec.domain }}
+  {{- $kcNs := "keycloak-system" }}
+  {{- $kcCr := "main" }}
+  {{- $realm := $name }}
+  {{- $seedUsers := false }}
+  {{- if $identity.keycloak }}
+  {{- if $identity.keycloak.namespace }}{{ $kcNs = $identity.keycloak.namespace }}{{- end }}
+  {{- if $identity.keycloak.instanceName }}{{ $kcCr = $identity.keycloak.instanceName }}{{- end }}
+  {{- if $identity.keycloak.realm }}{{ $realm = $identity.keycloak.realm }}{{- end }}
+  {{- if $identity.keycloak.seedUsers }}{{ $seedUsers = true }}{{- end }}
+  {{- end }}
+  {{- $loginTheme := "keycloak" }}
+  {{- if and $identity.keycloak $identity.keycloak.loginTheme }}{{ $loginTheme = $identity.keycloak.loginTheme }}{{- end }}
+  {{- $secretNs := "openshift-config" }}
+  {{- $secretName := printf "%s-client-secret" $name }}
+  {{- if and $identity $identity.clientSecretRef $identity.clientSecretRef.name }}
+  {{- $secretName = $identity.clientSecretRef.name }}
+  {{- if $identity.clientSecretRef.namespace }}{{ $secretNs = $identity.clientSecretRef.namespace }}{{- end }}
+  {{- end }}
+  {{- $clientSecret := "VDRjA2vWjJwlSZQ9tickuGkBQpiiJHdN" }}
+  {{- $secret := lookup "v1" "Secret" $secretNs $secretName }}
+  {{- if $secret }}{{ $clientSecret = ($secret.data.clientSecret | b64dec) }}{{- end }}
+  {{- $idpName := printf "%s-idp" $name }}
+  {{- if and $identity $identity.consoleLoginName }}{{ $idpName = $identity.consoleLoginName }}{{- end }}
   - complianceType: musthave
     objectDefinition:
       apiVersion: k8s.keycloak.org/v2alpha1
       kind: KeycloakRealmImport
       metadata:
         name: {{ $name }}-realm-import
-        namespace: keycloak-system
+        namespace: {{ $kcNs }}
       spec:
-        keycloakCRName: main
+        keycloakCRName: {{ $kcCr }}
         realm:
-          id: {{ $name }}
-          realm: {{ $name }}
+          id: {{ $realm }}
+          realm: {{ $realm }}
           enabled: true
+          loginTheme: {{ $loginTheme }}
           groups:
             - name: {{ $tenant.spec.adminGroup }}
               path: /{{ $tenant.spec.adminGroup }}
+              realmRoles:
+                - {{ $tenant.spec.adminGroup }}
             - name: {{ $tenant.spec.userGroup }}
               path: /{{ $tenant.spec.userGroup }}
+              realmRoles:
+                - {{ $tenant.spec.userGroup }}
             {{- if $tenant.spec.viewerGroup }}
             - name: {{ $tenant.spec.viewerGroup }}
               path: /{{ $tenant.spec.viewerGroup }}
+              realmRoles:
+                - {{ $tenant.spec.viewerGroup }}
             {{- end }}
           roles:
             realm:
@@ -31,23 +67,50 @@ object-templates-raw: |
               {{- if $tenant.spec.viewerGroup }}
               - name: {{ $tenant.spec.viewerGroup }}
               {{- end }}
+          {{- if $seedUsers }}
           users:
-            - username: {{ $name }}-admin
+            - username: admin@{{ $name }}.local
               enabled: true
-              realmRoles:
-                - {{ $tenant.spec.adminGroup }}
+              firstName: Admin
+              lastName: Default
+              groups:
+                - /{{ $tenant.spec.adminGroup }}
               credentials:
                 - type: password
-                  value: changeme
-                  temporary: true
+                  value: password
+                  temporary: false
+            - username: user@{{ $name }}.local
+              enabled: true
+              firstName: User
+              lastName: Default
+              groups:
+                - /{{ $tenant.spec.userGroup }}
+              credentials:
+                - type: password
+                  value: password
+                  temporary: false
+            {{- if $tenant.spec.viewerGroup }}
+            - username: viewer@{{ $name }}.local
+              enabled: true
+              firstName: Viewer
+              lastName: Default
+              groups:
+                - /{{ $tenant.spec.viewerGroup }}
+              credentials:
+                - type: password
+                  value: password
+                  temporary: false
+            {{- end }}
+          {{- end }}
           clients:
-            - clientId: openshift-{{ $name }}
-              secret: VDRjA2vWjJwlSZQ9tickuGkBQpiiJHdN
+            - clientId: {{ if and $identity $identity.clientId }}{{ $identity.clientId }}{{ else }}openshift-{{ $name }}{{ end }}
+              secret: {{ $clientSecret }}
               enabled: true
               directAccessGrantsEnabled: true
               standardFlowEnabled: true
               redirectUris:
-                - "https://oauth-openshift.{{ $domain }}/oauth2callback/{{ $name }}-idp"
+                - "https://oauth-openshift.{{ $domain }}/oauth2callback/{{ $idpName }}"
+                - "https://console-openshift-console.{{ $domain }}/*"
               protocolMappers:
                 - name: groups
                   protocol: openid-connect
@@ -59,4 +122,5 @@ object-templates-raw: |
                     id.token.claim: "true"
                     access.token.claim: "true"
                     userinfo.token.claim: "true"
+  {{- end }}
   {{- end }}

@@ -69,8 +69,9 @@ the `.gitleaks.toml` allowlist entry.
 
 ## Seed admin password hardening
 
-The bootstrap user currently uses a hardcoded `changeme` password with
-`temporary: true`. Stronger options:
+The bootstrap users (`admin@`, `user@`, and optionally `viewer@` at
+`<tenant>.local`) currently share a demo password (`password`) with
+`temporary: false`. Stronger options:
 
 - **Per-tenant Secret lookup** — template uses `lookup` to read a Secret named
   `{tenant}-seed-credentials` from the Keycloak namespace and injects the
@@ -114,10 +115,10 @@ tokens.
 
 ## Realm lifecycle
 
-- Handle tenant deletion and realm cleanup. Currently, removing a Tenant CR
-  leaves the Keycloak realm orphaned. Consider setting `pruneObjectBehavior:
-  DeleteAll` on the policy or implementing a finalizer-based cleanup.
-- Realm import is additive — the RHBK Operator does not remove groups, roles,
-  or users that were deleted from the import spec. Document this behavior and
-  consider periodic reconciliation via the Keycloak Admin API if strict
-  declarative management is required.
+- **Tenant deletion:** `tenancy-hub-keycloak-realms` sets `pruneObjectBehavior: DeleteAll` so
+  `KeycloakRealmImport` CRs are removed when the Tenant CR is deleted. The identity reconciler
+  CronJob also removes orphan imports, OAuth IdPs (`openshift-{tenant}` clients), and default
+  client secrets.
+- **Keycloak DB:** Realm import is additive — the RHBK Operator does not remove groups, roles,
+  or users from the database when the import CR is deleted. Use the Keycloak Admin API for
+  strict DB cleanup if required.

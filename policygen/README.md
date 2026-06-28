@@ -27,8 +27,9 @@ policygen/
 │
 └── SC-System-and-Communications-Protection/   Tenant isolation (SC)
     ├── kustomization.yaml           Registers policygenerator-*.yaml
-    ├── policygenerator-hub.yaml     Hub Tenant CRD + tenancies namespace
+    ├── policygenerator-hub.yaml     Hub Tenant CRD + tenancies namespace + Keycloak realms
     ├── policygenerator-managed.yaml Managed cluster Tenant CRD + CR replication
+    ├── keycloak/                    Hub KeycloakRealmImport from Tenant CRs (see keycloak/README.md)
     └── tenancy/                     Tenant CRD, tenancies namespace, hub-range bridge
 ```
 
