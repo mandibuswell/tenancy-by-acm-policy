@@ -203,15 +203,29 @@ oc get rolebinding -n TENANT
 
 ## 5. Removing a tenant
 
-Delete the Tenant CR from the hub:
+Delete the Tenant CR from the hub (ACM console or CLI):
 
 ```bash
 oc delete tenant TENANT -n tenancies
 ```
 
-On the next policy evaluation cycle:
+On the next policy / reconciler cycle:
 
-- The bridge ConfigMap is regenerated without the deleted tenant.
-- Hub ClusterRoleBindings and MulticlusterRoleAssignments for that tenant are no longer produced. Previously created hub resources must be cleaned up manually (or via a separate `mustnothave` policy) because `mustonlyhave` only enforces objects that the template produces.
-- Managed-cluster resources (Namespace, Quotas, RoleBindings, Network) are no longer produced by the templates. The CM Application has `prune: true` so ArgoCD will remove the generated policies, and ACM will then remove resources from managed clusters.
-- The AC Application has `prune: false` — RBAC removals require a manual sync with pruning or direct cleanup to avoid accidental access revocation during refactoring.
+| Resource | Auto-cleaned? | How |
+|----------|---------------|-----|
+| Bridge / managed-cluster templates | Yes | Tenant drops out of `lookup` range; CM policies stop producing spoke resources |
+| **KeycloakRealmImport** | Yes | `tenancy-hub-keycloak-realms` uses `pruneObjectBehavior: DeleteAll` |
+| **OAuth IdP** (`{tenant}-idp`) | Yes | Identity reconciler CronJob removes IdPs whose `openshift-{tenant}` client has no Tenant CR |
+| **Client secret** (`openshift-config/{tenant}-client-secret`) | Yes | Reconciler deletes default secret after removing orphan IdP |
+| **Custom theme** (ConfigMap + Keycloak mount) | No | Run `apply-themes.sh -d -t TENANT` in the demo repo |
+| **Hub ClusterRoleBindings / MCRAs** | No | AC Application has `prune: false` — remove manually or sync with prune |
+
+**Custom identity fields:** IdP/secret cleanup assumes default naming (`openshift-{tenant}` client, `{tenant}-client-secret`). Tenants with custom `clientId` or `clientSecretRef.name` may need manual OAuth/secret cleanup after delete.
+
+**Keycloak DB:** Deleting `KeycloakRealmImport` removes the CR; stale realm data in the Keycloak database may linger (RHBK is additive). Use the Keycloak admin API for strict DB cleanup if required.
+
+**Legacy theme-only tenants** (no `spec.identity`, created via `apply-themes.sh -r`): deleting the Tenant CR triggers policy realm-import prune; OAuth IdP cleanup uses the same `openshift-{tenant}` rule when the Tenant CR is gone.
+
+Previously created hub RBAC (see below) still requires manual cleanup:
+
+- Hub ClusterRoleBindings and MulticlusterRoleAssignments are no longer produced by templates. The AC Application has `prune: false` — remove manually or sync with pruning to avoid leaving fleet bindings in place.

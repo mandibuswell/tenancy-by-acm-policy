@@ -34,6 +34,8 @@ policies:
       - Provision Tenant Keycloak Realms
     dependencies:
       - name: tenancy-hub-tenant-crd
+    # Remove KeycloakRealmImport CRs when the Tenant CR is deleted.
+    pruneObjectBehavior: DeleteAll
     manifests:
       - path: keycloak/realm-import-from-crd.yaml
 

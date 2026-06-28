@@ -67,6 +67,17 @@ this policy uses `remediationAction: enforce`; ACM will revert manual changes on
 the next sync. Use separate realm names for themed SSO demos (for example
 `mandalorian` instead of `starwars`).
 
+## Tenant deletion
+
+When a `Tenant` CR is deleted:
+
+1. **KeycloakRealmImport** — removed by `tenancy-hub-keycloak-realms` (`pruneObjectBehavior: DeleteAll`).
+2. **OAuth IdP + client secret** — removed by the identity reconciler CronJob for default `openshift-{tenant}` clients.
+3. **Custom CSS themes** — not removed by policy; run `apply-themes.sh -d -t <tenant>` in the demo repo.
+4. **Hub fleet RBAC** — manual cleanup (AC policy app has `prune: false`).
+
+The Keycloak **database** realm may persist after the import CR is deleted; see [TODO.md](TODO.md).
+
 ## Further work
 
 See [TODO.md](TODO.md) for client-secret lookup, OAuth IdP automation, and

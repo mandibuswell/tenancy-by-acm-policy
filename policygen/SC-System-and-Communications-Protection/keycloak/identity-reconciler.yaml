@@ -21,10 +21,13 @@ rules:
     verbs: ["get", "patch", "update"]
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "delete"]
   - apiGroups: ["route.openshift.io"]
     resources: ["routes"]
     verbs: ["get", "list"]
+  - apiGroups: ["k8s.keycloak.org"]
+    resources: ["keycloakrealmimports"]
+    verbs: ["get", "list", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -63,6 +66,55 @@ data:
     patch_status() {
       local ns=$1 name=$2 payload=$3
       oc patch tenant "$name" -n "$ns" --subresource=status --type=merge -p "$payload" 2>/dev/null || true
+    }
+
+    # Remove OpenShift OAuth IdPs and client secrets for tenants whose CR was deleted.
+    # Matches IdPs created by this reconciler (openID clientID openshift-{tenant}).
+    cleanup_orphan_identity_providers() {
+      local oauth_json tenant_names count idx cid idp_name tenant removed
+      oauth_json=$(oc get oauth cluster -o json)
+      tenant_names=$(oc get tenants.dusty-seahorse.io -n tenancies -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+      count=$(echo "$oauth_json" | jq '.spec.identityProviders | length')
+      removed=0
+      idx=$((count - 1))
+      while [ "$idx" -ge 0 ]; do
+        cid=$(echo "$oauth_json" | jq -r ".spec.identityProviders[$idx].openID.clientID // empty")
+        idp_name=$(echo "$oauth_json" | jq -r ".spec.identityProviders[$idx].name // empty")
+        if [ -n "$cid" ] && [[ "$cid" =~ ^openshift-(.+)$ ]]; then
+          tenant="${BASH_REMATCH[1]}"
+          if ! echo "$tenant_names" | grep -qx "$tenant"; then
+            echo "Removing orphan IdP ${idp_name} (client ${cid}, tenant ${tenant} deleted)"
+            if oc patch oauth cluster --type=json -p="[{\"op\":\"remove\",\"path\":\"/spec/identityProviders/${idx}\"}]"; then
+              removed=$((removed + 1))
+              oauth_json=$(oc get oauth cluster -o json)
+              if oc get secret "${tenant}-client-secret" -n openshift-config &>/dev/null; then
+                echo "Deleting orphan secret openshift-config/${tenant}-client-secret"
+                oc delete secret "${tenant}-client-secret" -n openshift-config
+              fi
+            fi
+          fi
+        fi
+        idx=$((idx - 1))
+      done
+      if [ "$removed" -gt 0 ]; then
+        echo "Removed ${removed} orphan identity provider(s)"
+      fi
+    }
+
+    # Fallback if policy prune lags: delete realm imports whose tenant CR is gone.
+    cleanup_orphan_realm_imports() {
+      while read -r import; do
+        name=$(echo "$import" | jq -r '.metadata.name')
+        ns=$(echo "$import" | jq -r '.metadata.namespace')
+        tenant="${name%-realm-import}"
+        if [ "$tenant" = "$name" ]; then
+          continue
+        fi
+        if ! oc get tenant "$tenant" -n tenancies &>/dev/null; then
+          echo "Deleting orphan KeycloakRealmImport ${ns}/${name}"
+          oc delete keycloakrealmimport "$name" -n "$ns" --ignore-not-found
+        fi
+      done < <(oc get keycloakrealmimport -A -o json 2>/dev/null | jq -c '.items[]?')
     }
 
     DOMAIN=$(oc get ingresses.config cluster -o jsonpath='{.spec.domain}')
@@ -157,6 +209,9 @@ data:
       patch_status "$NS" "$NAME" "$STATUS"
       echo "Reconciled tenant ${NAME} IdP ${IDP_NAME} (${PHASE})"
     done
+
+    cleanup_orphan_identity_providers
+    cleanup_orphan_realm_imports
 ---
 apiVersion: batch/v1
 kind: CronJob
