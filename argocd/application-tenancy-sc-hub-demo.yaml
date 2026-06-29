@@ -1,22 +1,18 @@
 ---
-
-## This application renders the Tenant CRD and optional GitOps-managed Tenant CRs.
-# tenancies/kustomization.yaml is intentionally empty — create tenants via the
-# Create Tenant console plugin or oc apply -f examples/tenant-*.yaml.
-# With prune enabled, removing a Tenant from this path deletes it from the cluster.
-
+# Optional — enable for workshop clusters with keycloak-system franchise SSO demos.
+# Production hubs using external OIDC or customer Keycloak do not need this Application.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: tenancy-base
+  name: tenancy-sc-hub-demo
   namespace: openshift-gitops
 spec:
   destination:
-    namespace: tenancies
+    namespace: policies
     server: https://kubernetes.default.svc
   project: tenancy-policy
   source:
-    path: tenancies
+    path: policygen/SC-System-and-Communications-Protection/demo
     repoURL: https://github.com/ngner/tenancy-by-acm-policy.git
     targetRevision: master
   syncPolicy:
