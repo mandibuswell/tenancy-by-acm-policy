@@ -5,6 +5,7 @@ object-templates-raw: |
   {{- $mlb := $net.metallb | default dict }}
   {{- if $mlb.peerASN }}
   - complianceType: mustonlyhave
+    metadataComplianceType: musthave
     objectDefinition:
       apiVersion: metallb.io/v1beta2
       kind: BGPPeer

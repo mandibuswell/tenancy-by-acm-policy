@@ -3,6 +3,7 @@ object-templates-raw: |
   {{- $tenantName := $tenant.metadata.name }}
   {{- $workloadNs := $tenant.spec.workloadNamespace | default $tenantName }}
   - complianceType: mustonlyhave
+    metadataComplianceType: musthave
     objectDefinition:
       apiVersion: rbac.open-cluster-management.io/v1beta1
       kind: MulticlusterRoleAssignment
@@ -44,6 +45,7 @@ object-templates-raw: |
             - name: policies-placement-managed-clusters
               namespace: policies
   - complianceType: mustonlyhave
+    metadataComplianceType: musthave
     objectDefinition:
       apiVersion: rbac.open-cluster-management.io/v1beta1
       kind: MulticlusterRoleAssignment
@@ -86,6 +88,7 @@ object-templates-raw: |
               namespace: policies
   {{- if $tenant.spec.viewerGroup }}
   - complianceType: mustonlyhave
+    metadataComplianceType: musthave
     objectDefinition:
       apiVersion: rbac.open-cluster-management.io/v1beta1
       kind: MulticlusterRoleAssignment

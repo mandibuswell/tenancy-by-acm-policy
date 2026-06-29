@@ -3,6 +3,7 @@ object-templates-raw: |
   {{- $tenantName := $tenant.metadata.name }}
   {{- $workloadNs := $tenant.spec.workloadNamespace | default $tenantName }}
   - complianceType: musthave
+    metadataComplianceType: musthave
     objectDefinition:
       kind: Namespace
       apiVersion: v1

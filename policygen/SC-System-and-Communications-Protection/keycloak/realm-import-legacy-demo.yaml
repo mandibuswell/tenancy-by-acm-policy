@@ -1,50 +1,26 @@
+# Demo-only: Keycloak realms for Tenant CRs WITHOUT spec.identity (franchise SSO workshops).
+# Enable via the optional Argo app tenancy-sc-hub-demo — not part of production hub policy.
 object-templates-raw: |
   {{- range $tenant := (lookup "dusty-seahorse.io/v1alpha1" "Tenant" "tenancies" "").items }}
+  {{- if not $tenant.spec.identity }}
   {{- $name := $tenant.metadata.name }}
-  {{- $identity := $tenant.spec.identity }}
-  {{- $manageKeycloak := false }}
-  {{- if and $identity $identity.enabled (eq ($identity.provider | default "keycloak") "keycloak") $identity.keycloak $identity.keycloak.manageRealm }}
-  {{- $manageKeycloak = true }}
-  {{- end }}
-  {{- if not $manageKeycloak }}{{- else }}
   {{- $domain := (lookup "config.openshift.io/v1" "Ingress" "" "cluster").spec.domain }}
   {{- $kcNs := "keycloak-system" }}
   {{- $kcCr := "main" }}
   {{- $realm := $name }}
-  {{- $seedUsers := false }}
-  {{- $seedPassword := "password" }}
-  {{- $seedPasswordTemporary := false }}
-  {{- if $identity.keycloak }}
-  {{- if $identity.keycloak.namespace }}{{ $kcNs = $identity.keycloak.namespace }}{{- end }}
-  {{- if $identity.keycloak.instanceName }}{{ $kcCr = $identity.keycloak.instanceName }}{{- end }}
-  {{- if $identity.keycloak.realm }}{{ $realm = $identity.keycloak.realm }}{{- end }}
-  {{- if $identity.keycloak.seedUsers }}{{ $seedUsers = true }}{{- end }}
-  {{- if $identity.keycloak.seedPassword }}{{ $seedPassword = $identity.keycloak.seedPassword }}{{- end }}
-  {{- if $identity.keycloak.requirePasswordChange }}{{ $seedPasswordTemporary = true }}{{- end }}
-  {{- end }}
-  {{- $loginTheme := "keycloak" }}
-  {{- if and $identity.keycloak $identity.keycloak.loginTheme }}{{ $loginTheme = $identity.keycloak.loginTheme }}{{- end }}
-  {{- $secretNs := "openshift-config" }}
+  {{- $loginTheme := $realm }}
+  {{- if eq $realm "battlestar" }}{{ $loginTheme = "bsg" }}{{- end }}
   {{- $secretName := printf "%s-client-secret" $name }}
-  {{- if and $identity $identity.clientSecretRef $identity.clientSecretRef.name }}
-  {{- $secretName = $identity.clientSecretRef.name }}
-  {{- if $identity.clientSecretRef.namespace }}{{ $secretNs = $identity.clientSecretRef.namespace }}{{- end }}
-  {{- end }}
   {{- $clientSecret := "VDRjA2vWjJwlSZQ9tickuGkBQpiiJHdN" }}
-  {{- $secret := lookup "v1" "Secret" $secretNs $secretName }}
+  {{- $secret := lookup "v1" "Secret" "openshift-config" $secretName }}
   {{- if $secret }}{{ $clientSecret = ($secret.data.clientSecret | b64dec) }}{{- end }}
-  {{- $idpName := printf "%s-idp" $name }}
-  {{- if and $identity $identity.consoleLoginName }}{{ $idpName = $identity.consoleLoginName }}{{- end }}
   - complianceType: musthave
-    metadataComplianceType: musthave
     objectDefinition:
       apiVersion: k8s.keycloak.org/v2alpha1
       kind: KeycloakRealmImport
       metadata:
         name: {{ $name }}-realm-import
         namespace: {{ $kcNs }}
-        labels:
-          tenant: {{ $name | quote }}
       spec:
         keycloakCRName: {{ $kcCr }}
         realm:
@@ -74,7 +50,6 @@ object-templates-raw: |
               {{- if $tenant.spec.viewerGroup }}
               - name: {{ $tenant.spec.viewerGroup }}
               {{- end }}
-          {{- if $seedUsers }}
           users:
             - username: admin@{{ $name }}.local
               enabled: true
@@ -84,8 +59,8 @@ object-templates-raw: |
                 - /{{ $tenant.spec.adminGroup }}
               credentials:
                 - type: password
-                  value: {{ $seedPassword | quote }}
-                  temporary: {{ $seedPasswordTemporary }}
+                  value: password
+                  temporary: false
             - username: user@{{ $name }}.local
               enabled: true
               firstName: User
@@ -94,8 +69,8 @@ object-templates-raw: |
                 - /{{ $tenant.spec.userGroup }}
               credentials:
                 - type: password
-                  value: {{ $seedPassword | quote }}
-                  temporary: {{ $seedPasswordTemporary }}
+                  value: password
+                  temporary: false
             {{- if $tenant.spec.viewerGroup }}
             - username: viewer@{{ $name }}.local
               enabled: true
@@ -105,18 +80,17 @@ object-templates-raw: |
                 - /{{ $tenant.spec.viewerGroup }}
               credentials:
                 - type: password
-                  value: {{ $seedPassword | quote }}
-                  temporary: {{ $seedPasswordTemporary }}
+                  value: password
+                  temporary: false
             {{- end }}
-          {{- end }}
           clients:
-            - clientId: {{ if and $identity $identity.clientId }}{{ $identity.clientId }}{{ else }}openshift-{{ $name }}{{ end }}
+            - clientId: openshift-{{ $name }}
               secret: {{ $clientSecret }}
               enabled: true
               directAccessGrantsEnabled: true
               standardFlowEnabled: true
               redirectUris:
-                - "https://oauth-openshift.{{ $domain }}/oauth2callback/{{ $idpName }}"
+                - "https://oauth-openshift.{{ $domain }}/oauth2callback/{{ $name }}-idp"
                 - "https://console-openshift-console.{{ $domain }}/*"
               protocolMappers:
                 - name: groups

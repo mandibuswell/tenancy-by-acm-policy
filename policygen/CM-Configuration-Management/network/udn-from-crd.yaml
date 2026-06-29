@@ -5,6 +5,7 @@ object-templates-raw: |
   {{- $net := $tenant.spec.network | default dict }}
   {{- if $net.udnSubnet }}
   - complianceType: mustonlyhave
+    metadataComplianceType: musthave
     objectDefinition:
       apiVersion: k8s.ovn.org/v1
       kind: UserDefinedNetwork

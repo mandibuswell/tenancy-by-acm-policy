@@ -7,6 +7,7 @@ object-templates-raw: |
   {{- $vq := $tenant.spec.vmQuota | default dict }}
   {{- $lr := $tenant.spec.limitRange | default dict }}
   - complianceType: mustonlyhave
+    metadataComplianceType: musthave
     objectDefinition:
       apiVersion: v1
       kind: ResourceQuota
@@ -23,6 +24,7 @@ object-templates-raw: |
           requests.storage: "{{ $rq.storage | default "2000Gi" }}"
   {{- if $aaqCrd }}
   - complianceType: mustonlyhave
+    metadataComplianceType: musthave
     objectDefinition:
       apiVersion: aaq.kubevirt.io/v1alpha1
       kind: ApplicationAwareResourceQuota
@@ -39,6 +41,7 @@ object-templates-raw: |
           limits.memory/vmi: "{{ $vq.memory | default "320Gi" }}"
   {{- end }}
   - complianceType: mustonlyhave
+    metadataComplianceType: musthave
     objectDefinition:
       apiVersion: v1
       kind: LimitRange
