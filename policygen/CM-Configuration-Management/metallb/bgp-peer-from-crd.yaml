@@ -1,6 +1,6 @@
 object-templates-raw: |
   {{- range $tenant := (lookup "dusty-seahorse.io/v1alpha1" "Tenant" "tenancies" "").items }}
-  {{- $name := $tenant.metadata.name }}
+  {{- $tenantName := $tenant.metadata.name }}
   {{- $net := $tenant.spec.network | default dict }}
   {{- $mlb := $net.metallb | default dict }}
   {{- if $mlb.peerASN }}
@@ -9,8 +9,10 @@ object-templates-raw: |
       apiVersion: metallb.io/v1beta2
       kind: BGPPeer
       metadata:
-        name: {{ $name }}-bgp-peer
+        name: {{ $tenantName }}-bgp-peer
         namespace: metallb-system
+        labels:
+          tenant: {{ $tenantName | quote }}
       spec:
         myASN: {{ $mlb.myASN | default 64500 }}
         peerASN: {{ $mlb.peerASN }}

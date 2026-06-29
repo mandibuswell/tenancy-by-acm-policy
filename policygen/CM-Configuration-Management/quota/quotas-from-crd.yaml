@@ -1,6 +1,7 @@
 object-templates-raw: |
   {{- range $tenant := (lookup "dusty-seahorse.io/v1alpha1" "Tenant" "tenancies" "").items }}
-  {{- $name := $tenant.metadata.name }}
+  {{- $tenantName := $tenant.metadata.name }}
+  {{- $workloadNs := $tenant.spec.workloadNamespace | default $tenantName }}
   {{- $rq := $tenant.spec.resourceQuota | default dict }}
   {{- $vq := $tenant.spec.vmQuota | default dict }}
   {{- $lr := $tenant.spec.limitRange | default dict }}
@@ -9,8 +10,10 @@ object-templates-raw: |
       apiVersion: v1
       kind: ResourceQuota
       metadata:
-        name: {{ $name }}-resource-quota
-        namespace: {{ $name }}
+        name: {{ $tenantName }}-resource-quota
+        namespace: {{ $workloadNs }}
+        labels:
+          tenant: {{ $tenantName | quote }}
       spec:
         hard:
           requests.cpu: "{{ $rq.cpu | default "86" }}"
@@ -22,8 +25,10 @@ object-templates-raw: |
       apiVersion: aaq.kubevirt.io/v1alpha1
       kind: ApplicationAwareResourceQuota
       metadata:
-        name: {{ $name }}-vm-resource-quota
-        namespace: {{ $name }}
+        name: {{ $tenantName }}-vm-resource-quota
+        namespace: {{ $workloadNs }}
+        labels:
+          tenant: {{ $tenantName | quote }}
       spec:
         hard:
           requests.cpu/vmi: "{{ $vq.cpu | default "80" }}"
@@ -35,8 +40,10 @@ object-templates-raw: |
       apiVersion: v1
       kind: LimitRange
       metadata:
-        name: {{ $name }}-limit-range
-        namespace: {{ $name }}
+        name: {{ $tenantName }}-limit-range
+        namespace: {{ $workloadNs }}
+        labels:
+          tenant: {{ $tenantName | quote }}
       spec:
         limits:
           - type: Container

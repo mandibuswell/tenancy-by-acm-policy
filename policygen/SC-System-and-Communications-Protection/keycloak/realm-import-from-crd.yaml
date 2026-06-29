@@ -42,6 +42,8 @@ object-templates-raw: |
       metadata:
         name: {{ $name }}-realm-import
         namespace: {{ $kcNs }}
+        labels:
+          tenant: {{ $name | quote }}
       spec:
         keycloakCRName: {{ $kcCr }}
         realm:

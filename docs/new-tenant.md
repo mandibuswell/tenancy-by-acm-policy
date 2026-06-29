@@ -17,7 +17,9 @@ Fill in the table below before creating the Tenant CR. All fields except `adminG
 
 | Parameter          | Description                                                                                                       | Example              |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------- | -------------------- |
-| **Tenant name**    | Namespace name on managed clusters, used as prefix everywhere                                                     | `starwars`           |
+| **Tenant label**   | All provisioned objects carry `tenant: <name>` for selection and auditing                                         | `tenant: starwars`   |
+| **Tenant name**    | Tenant CR name and default workload namespace on managed clusters; prefix for groups, MetalLB, realms | `starwars`           |
+| **Workload namespace** | Optional override for the managed-cluster namespace (`spec.workloadNamespace`). Defaults to tenant name. Use `{tenant}-ns` if you want a suffix. | `starwars` or `starwars-ns` |
 | **Tenant-Admin group**    | IdP group granted `admin` in the namespace + `kubevirt.io:admin` on VMs + `acm-vm-fleet:view` on the hub console  | `starwars-tenant-admin`  |
 | **Tenant-User group**     | IdP group granted `edit` in the namespace + `kubevirt.io:edit` on VMs + `acm-vm-fleet:view` on the hub console    | `starwars-tenant-user`   |
 | **Tenant-Viewer group**   | IdP group granted `view` in the namespace + `kubevirt.io:view` on VMs + `acm-vm-fleet:view` on the hub console    | `starwars-tenant-viewer` |
