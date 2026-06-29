@@ -203,6 +203,25 @@ oc get userdefinednetwork -n TENANT
 oc get rolebinding -n TENANT
 ```
 
+### 4.1 Tenant console login and first VM
+
+Tenant **workload namespaces exist on managed clusters only** (not on the ACM hub). After SSO login on the hub:
+
+1. Open the **Fleet Management** perspective (requires `acm-vm-fleet:view` on your IdP group — provisioned automatically).
+2. Go to **Virtualization** and select the managed cluster (e.g. `aws-us`).
+3. Open namespace **TENANT** — create or manage VMs there.
+
+Do **not** use the hub **Virtualization** perspective for tenant workloads; that view is hub-local and will not show tenant namespaces.
+
+An empty namespace on first login is normal. Seed a starter VM on the managed cluster (cluster-admin kubeconfig):
+
+```bash
+cd demo-setups/use-cases/acm-tenancy-workloads
+./seed-tenant-vm.sh -t TENANT
+```
+
+This deploys a small RHEL9 VM (`TENANT-starter`, `cloud-user` / `redhat`) so tenant admins see at least one VM in the fleet console.
+
 ---
 
 ## 5. Removing a tenant
