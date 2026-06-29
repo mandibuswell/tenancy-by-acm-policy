@@ -166,13 +166,15 @@ Once the Tenant CR is created, the policy evaluation cycle produces the followin
    - UserDefinedNetwork (if `network.udnSubnet` is set)
    - MetalLB BGPPeer, IPAddressPool, BGPAdvertisement (if `network.metallb` is set)
    - RoleBindings for Tenant-Admin, Tenant-User and Tenant-Viewer groups
-5. **Hub Keycloak policy** (`tenancy-hub-keycloak-realms`, when Keycloak is installed) creates a realm per tenant with seed users:
+5. **Hub Keycloak policy** (`tenancy-hub-keycloak-realms`, when `manageRealm` and `seedUsers` are true) bootstraps demo users:
 
    | Username | Password | Group |
    |----------|----------|-------|
-   | `admin@<tenant>.local` | `password` | `<tenant>-tenant-admin` |
-   | `user@<tenant>.local` | `password` | `<tenant>-tenant-user` |
-   | `viewer@<tenant>.local` | `password` | `<tenant>-tenant-viewer` (if `viewerGroup` set) |
+   | `admin@<tenant>.local` | `spec.identity.keycloak.seedPassword` (default `password`) | `<tenant>-tenant-admin` |
+   | `user@<tenant>.local` | same | `<tenant>-tenant-user` |
+   | `viewer@<tenant>.local` | same | `<tenant>-tenant-viewer` (if `viewerGroup` set) |
+
+   Set `requirePasswordChange: true` to force a password change on first login.
 
    See [`policygen/SC-System-and-Communications-Protection/keycloak/README.md`](../policygen/SC-System-and-Communications-Protection/keycloak/README.md) for OIDC client and theme notes.
 

@@ -70,8 +70,8 @@ the `.gitleaks.toml` allowlist entry.
 ## Seed admin password hardening
 
 The bootstrap users (`admin@`, `user@`, and optionally `viewer@` at
-`<tenant>.local`) currently share a demo password (`password`) with
-`temporary: false`. Stronger options:
+`<tenant>.local`) use `spec.identity.keycloak.seedPassword` (default `password`)
+and optional `requirePasswordChange` (maps to Keycloak `temporary`). Stronger options:
 
 - **Per-tenant Secret lookup** — template uses `lookup` to read a Secret named
   `{tenant}-seed-credentials` from the Keycloak namespace and injects the

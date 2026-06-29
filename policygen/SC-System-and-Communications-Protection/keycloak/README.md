@@ -47,13 +47,15 @@ See [`examples/tenant-gigashadow-identity.yaml`](../../../examples/tenant-gigash
 
 When `manageRealm` and `seedUsers` are both true, each tenant realm is bootstrapped with demo users:
 
-| Username | Group | Password |
-|----------|-------|----------|
-| `admin@<tenant>.local` | `<tenant>-tenant-admin` | `password` |
-| `user@<tenant>.local` | `<tenant>-tenant-user` | `password` |
-| `viewer@<tenant>.local` | `<tenant>-tenant-viewer` | `password` |
+| Username | Group | Default password |
+|----------|-------|------------------|
+| `admin@<tenant>.local` | `<tenant>-tenant-admin` | `spec.identity.keycloak.seedPassword` (default `password`) |
+| `user@<tenant>.local` | `<tenant>-tenant-user` | same |
+| `viewer@<tenant>.local` | `<tenant>-tenant-viewer` | same |
 
-These are **workshop bootstrap accounts only**.
+Set `requirePasswordChange: true` to force a password change on first login (Keycloak `temporary` credential).
+
+These are **workshop bootstrap accounts only** — the password is stored in plain text on the Tenant CR.
 
 ## OIDC client and OpenShift login
 
