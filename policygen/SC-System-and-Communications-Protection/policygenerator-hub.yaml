@@ -28,6 +28,9 @@ policies:
     manifests:
       - path: tenancy/tenant-crd.yaml
       - path: tenancy/tenancies-namespace.yaml
+        # mustonlyhave fights Tekton/OpenShift labels on the namespace and triggers
+        # namespace-validation webhook dry-runs; musthave only ensures the NS exists.
+        complianceType: musthave
 
   - name: tenancy-hub-keycloak-realms
     controls:
