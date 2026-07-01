@@ -1,5 +1,7 @@
 object-templates-raw: |
   {{- range $tenant := (lookup "dusty-seahorse.io/v1alpha1" "Tenant" "tenancies" "").items }}
+  {{- $profile := $tenant.spec.workloadProfile | default "vms" }}
+  {{- if or (eq $profile "containers") (eq $profile "both") }}
   {{- $tenantName := $tenant.metadata.name }}
   {{- $net := $tenant.spec.network | default dict }}
   {{- $mlb := $net.metallb | default dict }}
@@ -20,5 +22,6 @@ object-templates-raw: |
           - "{{ . }}"
           {{- end }}
         autoAssign: true
+  {{- end }}
   {{- end }}
   {{- end }}

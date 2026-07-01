@@ -20,6 +20,7 @@ Fill in the table below before creating the Tenant CR. All fields except `adminG
 | **Tenant label**   | All provisioned objects carry `tenant: <name>` for selection and auditing                                         | `tenant: starwars`   |
 | **Tenant name**    | Tenant CR name and default workload namespace on managed clusters; prefix for groups, MetalLB, realms | `starwars`           |
 | **Workload namespace** | Optional override for the managed-cluster namespace (`spec.workloadNamespace`). Defaults to tenant name. Use `{tenant}-ns` if you want a suffix. | `starwars` or `starwars-ns` |
+| **Workload profile** | What to provision: `vms` (default), `containers`, or `both` | `vms` |
 | **Tenant-Admin group**    | IdP group granted `admin` in the namespace + `kubevirt.io:admin` on VMs + `acm-vm-fleet:view` on the hub console  | `starwars-tenant-admin`  |
 | **Tenant-User group**     | IdP group granted `edit` in the namespace + `kubevirt.io:edit` on VMs + `acm-vm-fleet:view` on the hub console    | `starwars-tenant-user`   |
 | **Tenant-Viewer group**   | IdP group granted `view` in the namespace + `kubevirt.io:view` on VMs + `acm-vm-fleet:view` on the hub console    | `starwars-tenant-viewer` |
@@ -126,6 +127,17 @@ Each tenant can get its own MetalLB BGP peering session in a dedicated VRF for i
 | **IP pool**      | `network.metallb.addresses` | CIDR or range of external IPs assigned to this tenant's services          |
 
 If the `network.metallb` section is omitted from the Tenant CR, no MetalLB resources are created.
+
+### 1.8 Managed cluster capabilities
+
+Tenant policies only propagate to spokes labelled with at least one capability:
+
+| Label | Use for |
+|-------|---------|
+| `tenancy.acm.io/capability-container=true` | Container / application workloads |
+| `tenancy.acm.io/capability-vm=true` | VM workloads (requires CNV on the spoke) |
+
+Label before creating tenants. Dual-capability clusters carry both labels. See [placements/capabilities/README.md](../placements/capabilities/README.md).
 
 ---
 
