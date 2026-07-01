@@ -72,8 +72,8 @@ When a `Tenant` CR is deleted:
 1. **KeycloakRealmImport** — removed when `manageRealm` was true (`pruneObjectBehavior: DeleteAll`).
 2. **OAuth IdP + client secret** — removed by the identity reconciler CronJob.
 3. **Custom CSS themes** — run `apply-themes.sh -d -t <tenant>` in demo-setups.
-4. **Hub fleet RBAC** — manual cleanup (AC policy app has `prune: false`).
+4. **Hub fleet RBAC** — known issue: not auto-pruned on tenant delete (see [TODO.md](TODO.md#hub-fleet-rbac-on-tenant-delete--known-issue-documented)).
 
 ## Further work
 
-See [TODO.md](TODO.md).
+See [TODO.md](TODO.md) for completed items and remaining production hardening.
