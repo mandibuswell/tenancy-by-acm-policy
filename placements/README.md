@@ -5,6 +5,9 @@ The active placements are controlled by each subdirectory's `kustomization.yaml`
 
 See [capabilities/README.md](capabilities/README.md) for cluster capability labels.
 
+For a full map of Argo apps, PolicySets, and placements, see
+[docs/placements-cheatsheet.md](../docs/placements-cheatsheet.md).
+
 ## Policies placements (`placements/policies/`, namespace: `policies`)
 
 | File | Placement name | Targets |

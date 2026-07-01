@@ -126,6 +126,7 @@ The hub placement (`placements/policies/placement-hub.yaml`) is fixed to `local-
 ## Further reading
 
 - [Tenancy model](docs/tenancy-model.md) — personas, namespace/RBAC/UDN isolation layers, MetalLB BGP external connectivity, ACM VM console access, and VMware vCloud Director equivalents
+- [Placements cheat sheet](docs/placements-cheatsheet.md) — Argo apps, PolicySets, placements, and workload profile mapping
 - [Creating a new tenant](docs/new-tenant.md) — step-by-step with all configurable options (see [§1.2 ResourceQuota vs AAQ vs LimitRange](docs/new-tenant.md#12-resourcequota-vs-applicationawareresourcequota-vs-limitrange))
 
 ---
