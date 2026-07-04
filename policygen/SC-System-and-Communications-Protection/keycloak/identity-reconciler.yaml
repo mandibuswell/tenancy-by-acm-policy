@@ -123,8 +123,12 @@ data:
     }
 
     delete_tenant_client_secret() {
-      local tenant=$1 identity_json=${2:-{}}
+      local tenant=$1
+      local identity_json="${2-}"
       local secret_ns secret_name
+      if [ -z "$identity_json" ]; then
+        identity_json='{}'
+      fi
       secret_ns=$(echo "$identity_json" | jq -r '.clientSecretRef.namespace // "openshift-config"')
       secret_name=$(echo "$identity_json" | jq -r ".clientSecretRef.name // \"${tenant}-client-secret\"")
       if oc get secret "$secret_name" -n "$secret_ns" &>/dev/null; then
@@ -135,8 +139,12 @@ data:
 
     # Tear down IdP, client secret, and platform-managed Keycloak realm when SSO is disabled.
     cleanup_disabled_tenant_identity() {
-      local name=$1 ns=$2 identity_json=${3:-{}}
+      local name=$1 ns=$2
+      local identity_json="${3-}"
       local manage_realm kc_ns realm import_ns import_name
+      if [ -z "$identity_json" ]; then
+        identity_json=$(oc get tenant "$name" -n "$ns" -o json | jq -c '.spec.identity // {}')
+      fi
       echo "SSO disabled for tenant ${name}; cleaning up identity resources"
       remove_oauth_idp_for_tenant "$name"
       delete_tenant_client_secret "$name" "$identity_json"
