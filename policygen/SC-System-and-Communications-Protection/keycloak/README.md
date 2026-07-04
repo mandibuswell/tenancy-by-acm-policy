@@ -67,12 +67,23 @@ Custom CSS is **not** deployed by production policy. Optional `spec.identity.key
 
 ## Tenant deletion
 
-When a `Tenant` CR is deleted:
+When a `Tenant` CR is **deleted**:
 
 1. **KeycloakRealmImport** — removed when `manageRealm` was true (`pruneObjectBehavior: DeleteAll`).
 2. **OAuth IdP + client secret** — removed by the identity reconciler CronJob.
 3. **Custom CSS themes** — run `apply-themes.sh -d -t <tenant>` in demo-setups.
 4. **Hub fleet RBAC** — known issue: not auto-pruned on tenant delete (see [TODO.md](TODO.md#hub-fleet-rbac-on-tenant-delete--known-issue-documented)).
+
+## Disabling console SSO (`spec.identity.enabled: false`)
+
+When SSO is turned off on an existing tenant (Tenant CR kept):
+
+1. **OpenShift OAuth IdP** — removed by the identity reconciler (matches `openshift-{tenant}` client ID).
+2. **Client secret** — deleted from `openshift-config` (or `clientSecretRef` namespace).
+3. **KeycloakRealmImport + DB realm** — removed only when `keycloak.manageRealm` was true (platform-managed realm). Customer-owned realms (`manageRealm: false`) are not deleted from Keycloak.
+4. **Re-enable** — supply a new client secret in the form; reconciler registers a fresh IdP on the next cycle.
+
+The Create Tenant form preserves `clientSecretRef` and `manageRealm` hints on the CR when disabling so the reconciler can clean up safely.
 
 ## Further work
 

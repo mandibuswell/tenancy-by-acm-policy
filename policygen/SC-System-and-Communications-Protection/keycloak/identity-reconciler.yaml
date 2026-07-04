@@ -99,6 +99,62 @@ data:
       fi
     }
 
+    # Remove openshift-{tenant} IdP from oauth/cluster. Returns 0 if removed or absent.
+    remove_oauth_idp_for_tenant() {
+      local tenant=$1
+      local oauth_json count idx cid idp_name removed
+      oauth_json=$(oc get oauth cluster -o json)
+      count=$(echo "$oauth_json" | jq '.spec.identityProviders | length')
+      removed=0
+      idx=$((count - 1))
+      while [ "$idx" -ge 0 ]; do
+        cid=$(echo "$oauth_json" | jq -r ".spec.identityProviders[$idx].openID.clientID // empty")
+        idp_name=$(echo "$oauth_json" | jq -r ".spec.identityProviders[$idx].name // empty")
+        if [ -n "$cid" ] && [ "$cid" = "openshift-${tenant}" ]; then
+          echo "Removing IdP ${idp_name} (client ${cid}, tenant ${tenant})"
+          if oc patch oauth cluster --type=json -p="[{\"op\":\"remove\",\"path\":\"/spec/identityProviders/${idx}\"}]"; then
+            removed=1
+            oauth_json=$(oc get oauth cluster -o json)
+          fi
+        fi
+        idx=$((idx - 1))
+      done
+      return 0
+    }
+
+    delete_tenant_client_secret() {
+      local tenant=$1 identity_json=${2:-{}}
+      local secret_ns secret_name
+      secret_ns=$(echo "$identity_json" | jq -r '.clientSecretRef.namespace // "openshift-config"')
+      secret_name=$(echo "$identity_json" | jq -r ".clientSecretRef.name // \"${tenant}-client-secret\"")
+      if oc get secret "$secret_name" -n "$secret_ns" &>/dev/null; then
+        echo "Deleting client secret ${secret_ns}/${secret_name}"
+        oc delete secret "$secret_name" -n "$secret_ns"
+      fi
+    }
+
+    # Tear down IdP, client secret, and platform-managed Keycloak realm when SSO is disabled.
+    cleanup_disabled_tenant_identity() {
+      local name=$1 ns=$2 identity_json=${3:-{}}
+      local manage_realm kc_ns realm import_ns import_name
+      echo "SSO disabled for tenant ${name}; cleaning up identity resources"
+      remove_oauth_idp_for_tenant "$name"
+      delete_tenant_client_secret "$name" "$identity_json"
+      manage_realm=$(echo "$identity_json" | jq -r '.keycloak.manageRealm // false')
+      if [ "$manage_realm" = "true" ]; then
+        kc_ns=$(echo "$identity_json" | jq -r '.keycloak.namespace // "keycloak-system"')
+        realm=$(echo "$identity_json" | jq -r ".keycloak.realm // \"${name}\"")
+        import_ns="$kc_ns"
+        import_name="${name}-realm-import"
+        if oc get keycloakrealmimport "$import_name" -n "$import_ns" &>/dev/null; then
+          echo "Deleting KeycloakRealmImport ${import_ns}/${import_name}"
+          oc delete keycloakrealmimport "$import_name" -n "$import_ns" --ignore-not-found
+        fi
+        delete_keycloak_db_realm "$realm" "$kc_ns"
+      fi
+      patch_status "$ns" "$name" '{"status":{"identity":{"phase":"Disabled","message":"Console SSO disabled; IdP and client secret removed"}}}'
+    }
+
     # Remove OpenShift OAuth IdPs and client secrets for tenants whose CR was deleted.
     # Matches IdPs created by this reconciler (openID clientID openshift-{tenant}).
     cleanup_orphan_identity_providers() {
@@ -118,10 +174,7 @@ data:
             if oc patch oauth cluster --type=json -p="[{\"op\":\"remove\",\"path\":\"/spec/identityProviders/${idx}\"}]"; then
               removed=$((removed + 1))
               oauth_json=$(oc get oauth cluster -o json)
-              if oc get secret "${tenant}-client-secret" -n openshift-config &>/dev/null; then
-                echo "Deleting orphan secret openshift-config/${tenant}-client-secret"
-                oc delete secret "${tenant}-client-secret" -n openshift-config
-              fi
+              delete_tenant_client_secret "$tenant" '{}'
               delete_keycloak_db_realm "$tenant"
             fi
           fi
@@ -183,7 +236,11 @@ data:
       NAME=$(echo "$tenant" | jq -r '.metadata.name')
       NS=$(echo "$tenant" | jq -r '.metadata.namespace')
       IDENTITY=$(echo "$tenant" | jq -c '.spec.identity // empty')
-      if [ -z "$IDENTITY" ] || [ "$(echo "$IDENTITY" | jq -r '.enabled // false')" != "true" ]; then
+      if [ -z "$IDENTITY" ]; then
+        continue
+      fi
+      if [ "$(echo "$IDENTITY" | jq -r '.enabled // false')" != "true" ]; then
+        cleanup_disabled_tenant_identity "$NAME" "$NS" "$IDENTITY"
         continue
       fi
 

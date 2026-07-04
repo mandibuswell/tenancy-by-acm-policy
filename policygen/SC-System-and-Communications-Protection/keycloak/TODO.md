@@ -25,7 +25,7 @@ Not implemented: explicit `redirectUris` array (redirects are derived from Ingre
 
 ### OAuth IdP registration — DONE (reconciler, not policy)
 
-`identity-reconciler.yaml` CronJob patches `oauth/cluster` to add/update per-tenant OpenID IdPs, merges into the singleton (does not replace the list). Orphan IdPs and default client secrets are removed when the Tenant CR is deleted.
+`identity-reconciler.yaml` CronJob patches `oauth/cluster` to add/update per-tenant OpenID IdPs, merges into the singleton (does not replace the list). Orphan IdPs and client secrets are removed when the Tenant CR is deleted. When `spec.identity.enabled` is false, the reconciler removes the IdP and client secret (and platform-managed Keycloak realms when `manageRealm` was true).
 
 ### Client secret lookup in realm import — DONE (with fallback)
 
