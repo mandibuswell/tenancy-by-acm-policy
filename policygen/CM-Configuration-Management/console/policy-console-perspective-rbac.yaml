@@ -21,17 +21,24 @@ spec:
         visibility:
           state: Disabled
           
-      # 3. Enable the OpenShift Virtualization perspective
+      # 3. Hub-local Virtualization perspective — platform admins only.
+      #    Tenant workloads run on managed clusters; tenants use the ACM fleet view instead.
       - id: virtualization-perspective
-        visibility:
-          state: Enabled
-          
-      # 4. Hide the ACM "Fleet Management" perspective from tenants (only users who can list clusteroperators will see it)
-      - id: acm
         visibility:
           accessReview:
             required:
               - group: config.openshift.io
                 resource: clusteroperators
+                verb: list
+          state: AccessReview
+          
+      # 4. ACM Fleet Management — visible to tenant groups with acm-vm-fleet:view
+      #    (managedclusters list), not cluster-admin clusteroperators access.
+      - id: acm
+        visibility:
+          accessReview:
+            required:
+              - group: cluster.open-cluster-management.io
+                resource: managedclusters
                 verb: list
           state: AccessReview

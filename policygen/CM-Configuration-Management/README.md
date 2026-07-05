@@ -13,9 +13,18 @@ configuration policies.
 
 ### policygenerator-managed.yaml
 
-Targets managed clusters (`policies-placement-managed-clusters`) and depends on
-`tenancy-managed-tenant-replication` (tenancies namespace) being Compliant — ensuring the Tenant
-CRD and replicated Tenant CRs are present before downstream resources are created.
+Targets managed clusters and depends on `tenancy-managed-tenant-replication`
+(tenancies namespace) being Compliant — ensuring the Tenant CRD and replicated
+Tenant CRs are present before downstream resources are created.
+
+Two policy sets:
+
+- **`tenancy-managed-configuration`** — `policies-placement-managed-clusters`.
+  Container-side resources for tenants with `workloadProfile` `containers` or `both`.
+- **`tenancy-managed-vm-configuration`** — `policies-placement-managed-vm-clusters`.
+  VM-side resources (including AAQ) for tenants with `workloadProfile` `vms` or `both`.
+
+Per-tenant `spec.workloadProfile` defaults to **`vms`**.
 
 - **Namespace** with labels for tenant identification (`customer-namespace`) and
   primary user-defined network opt-in (`k8s.ovn.org/primary-user-defined-network`).
@@ -33,8 +42,10 @@ are applied.
 
 | Directory | File | Resource |
 |---|---|---|
-| `namespace/` | `namespaces-from-crd.yaml` | `object-templates-raw` — creates a Namespace per Tenant CR |
-| `quota/` | `quotas-from-crd.yaml` | `object-templates-raw` — creates ResourceQuota, AAQ, and LimitRange per Tenant CR |
+| `namespace/` | `namespaces-from-crd.yaml` | `object-templates-raw` — container/both tenants on managed placement |
+| `namespace/` | `namespaces-from-crd-vm.yaml` | `object-templates-raw` — vms/both tenants on VM placement |
+| `quota/` | `quotas-from-crd.yaml` | `object-templates-raw` — ResourceQuota + LimitRange (containers/both) |
+| `quota/` | `quotas-from-crd-vm.yaml` | `object-templates-raw` — ResourceQuota + AAQ + LimitRange (vms/both) |
 | `quota/` | `hyperconverged-aaq-enabled.yaml` | Enables the AAQ feature gate on HyperConverged |
 | `network/` | `udn-from-crd.yaml` | `object-templates-raw` — creates UserDefinedNetwork per Tenant CR (conditional on spec fields) |
 | `metallb/` | `bgp-peer-from-crd.yaml` | `object-templates-raw` — creates MetalLB BGPPeer per Tenant CR |

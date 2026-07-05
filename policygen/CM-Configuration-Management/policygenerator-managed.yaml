@@ -75,8 +75,59 @@ policies:
       - path: metallb/ip-address-pool-from-crd.yaml
       - path: metallb/bgp-advertisement-from-crd.yaml
 
+  - name: tenancy-managed-vm-namespaces
+    controls:
+      - Deploy Tenant Namespaces on VM clusters
+    policySets:
+      - tenancy-managed-vm-configuration
+    dependencies:
+      - name: tenancy-managed-tenant-replication
+        namespace: tenancies
+        compliance: Compliant
+    manifests:
+      - path: namespace/namespaces-from-crd-vm.yaml
+
+  - name: tenancy-managed-vm-quotas
+    controls:
+      - Deploy Tenant VM Resource Quotas
+    policySets:
+      - tenancy-managed-vm-configuration
+    dependencies:
+      - name: tenancy-managed-vm-namespaces
+        compliance: Compliant
+    manifests:
+      - path: quota/quotas-from-crd-vm.yaml
+
+  - name: tenancy-managed-vm-udn-network
+    controls:
+      - Deploy Tenant Networks via UDN on VM clusters
+    policySets:
+      - tenancy-managed-vm-configuration
+    dependencies:
+      - name: tenancy-managed-vm-namespaces
+        compliance: Compliant
+    manifests:
+      - path: network/udn-from-crd-vm.yaml
+
+  - name: tenancy-managed-vm-metallb-bgp
+    controls:
+      - Deploy Tenant External Connectivity via BGP on VM clusters
+    policySets:
+      - tenancy-managed-vm-configuration
+    dependencies:
+      - name: tenancy-managed-vm-namespaces
+        compliance: Compliant
+    manifests:
+      - path: metallb/bgp-peer-from-crd-vm.yaml
+      - path: metallb/ip-address-pool-from-crd-vm.yaml
+      - path: metallb/bgp-advertisement-from-crd-vm.yaml
+
 policySets:
   - name: tenancy-managed-configuration
     description: "Managed cluster tenant provisioning: namespaces, resource quotas, UDN network isolation, and MetalLB BGP external connectivity"
     placement:
       placementName: policies-placement-managed-clusters
+  - name: tenancy-managed-vm-configuration
+    description: "VM-capable managed clusters: tenant namespaces, AAQ quotas, UDN, and MetalLB for vms/both workload profiles"
+    placement:
+      placementName: policies-placement-managed-vm-clusters

@@ -13,7 +13,7 @@ the default `openshift-gitops` ArgoCD instance.
 | `application-tenancy-configuration-management.yaml` | Application | Syncs `policygen/CM-Configuration-Management` — Tenant namespaces, quotas, UDNs, MetalLB BGP |
 | `application-tenancy-system-and-communications-protection.yaml` | Application | Syncs `policygen/SC-System-and-Communications-Protection` — Tenant CRD deployment and CR replication |
 | `application-tenancy-placements.yaml` | Application | Syncs `placements/` — Placement rules referenced by generated policies |
-| `application-tenancy-base.yaml` | Application | Syncs `tenancies/` — Tenant CRs (source of truth for tenant definitions) |
+| `application-tenancy-base.yaml` | Application | Syncs `tenancies/` (empty by default; optional GitOps-managed Tenant CRs) |
 | `apply.sh` | Script | Applies all ArgoCD resources, auto-setting `targetRevision` to the current git branch (see [TESTING-BRANCHES.md](TESTING-BRANCHES.md)) |
 
 ## PolicyGenerator plugin setup
@@ -67,6 +67,8 @@ oc apply -f argocd/application-tenancy-system-and-communications-protection.yaml
 | `tenancy-system-and-communications-protection` | Yes | Yes | Yes |
 | `tenancy-placements` | Yes | Yes | Yes |
 
-`tenancy-base` syncs the Tenant CRs. Pruning and self-heal are enabled so the tenant
-definitions stay enforced. Access Control has pruning and self-heal disabled to prevent
-accidental removal of RBAC bindings during policy refactoring.
+`tenancy-base` syncs `tenancies/` (empty kustomization by default). Prune removes
+GitOps-managed Tenant CRs when they are deleted from git. Create tenants via the
+Create Tenant form unless you intentionally add CRs under `tenancies/`.
+Access Control has pruning and self-heal disabled to prevent accidental removal
+of RBAC bindings during policy refactoring.

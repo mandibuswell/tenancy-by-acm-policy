@@ -1,7 +1,7 @@
 object-templates-raw: |
   {{- range $tenant := (lookup "dusty-seahorse.io/v1alpha1" "Tenant" "tenancies" "").items }}
   {{- $profile := $tenant.spec.workloadProfile | default "vms" }}
-  {{- if or (eq $profile "containers") (eq $profile "both") }}
+  {{- if or (eq $profile "vms") (eq $profile "both") }}
   {{- $tenantName := $tenant.metadata.name }}
   {{- $net := $tenant.spec.network | default dict }}
   {{- $mlb := $net.metallb | default dict }}
@@ -9,18 +9,18 @@ object-templates-raw: |
   - complianceType: mustonlyhave
     metadataComplianceType: musthave
     objectDefinition:
-      apiVersion: metallb.io/v1beta2
-      kind: BGPPeer
+      apiVersion: metallb.io/v1beta1
+      kind: BGPAdvertisement
       metadata:
-        name: {{ $tenantName }}-bgp-peer
+        name: {{ $tenantName }}-bgp-advertisement
         namespace: metallb-system
         labels:
           tenant: {{ $tenantName | quote }}
       spec:
-        myASN: {{ $mlb.myASN | default 64500 }}
-        peerASN: {{ $mlb.peerASN }}
-        peerAddress: "{{ $mlb.peerAddress }}"
-        vrf: "{{ $mlb.vrf }}"
+        ipAddressPools:
+          - {{ $tenantName }}-ip-pool
+        peers:
+          - {{ $tenantName }}-bgp-peer
   {{- end }}
   {{- end }}
   {{- end }}

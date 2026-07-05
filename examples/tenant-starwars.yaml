@@ -2,14 +2,16 @@
 apiVersion: dusty-seahorse.io/v1alpha1
 kind: Tenant
 metadata:
-  name: startrek
+  name: starwars
   namespace: tenancies
+  labels:
+    tenant: starwars
 spec:
-  displayName: "Star Trek"
+  displayName: "Star Wars"
   owner: platform-team@example.com
-  adminGroup: startrek-tenant-admin
-  userGroup: startrek-tenant-user
-  viewerGroup: startrek-tenant-viewer
+  adminGroup: starwars-tenant-admin
+  userGroup: starwars-tenant-user
+  viewerGroup: starwars-tenant-viewer
 
   resourceQuota:
     cpu: "86"
@@ -27,11 +29,11 @@ spec:
     maxStorage: "1Ti"
 
   network:
-    udnSubnet: "10.0.2.0/24"
+    udnSubnet: "10.0.1.0/24"
     metallb:
       myASN: 64500
-      peerASN: 64502
-      peerAddress: "192.168.1.2"
-      vrf: startrek-vrf
+      peerASN: 64501
+      peerAddress: "192.168.1.1"
+      vrf: starwars-vrf
       addresses:
-        - "192.168.12.0/24"
+        - "192.168.11.0/24"
