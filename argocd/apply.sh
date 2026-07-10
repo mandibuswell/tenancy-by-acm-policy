@@ -33,10 +33,15 @@ if [[ -z "$REPO_URL" ]]; then
       ;;
     http*)
       REPO_URL="${origin%.git}"
+      # Strip embedded credentials (e.g. https://user@github.com/...) so AppProject sourceRepos match.
+      REPO_URL="${REPO_URL#https://*@}"
+      REPO_URL="${REPO_URL#http://*@}"
+      [[ "$REPO_URL" != http* ]] && REPO_URL="https://${REPO_URL}"
       ;;
   esac
 fi
 [[ -z "$REPO_URL" ]] && REPO_URL="$DEFAULT_REPO"
+REPO_URL="${REPO_URL%.git}"
 
 apply() {
     local file="$1"

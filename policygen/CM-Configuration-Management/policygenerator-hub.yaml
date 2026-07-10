@@ -31,7 +31,8 @@ policies:
     controls:
       - Enforce ACM Console Perspective Visibility
     manifests:
-      - path: console/policy-console-perspective-rbac.yaml
+      - path: console/tenant-portal-markers.yaml
+      - path: console/policy-console-perspective-rbac-vmaas.yaml
 
 policySets:
   - name: tenancy-hub-configuration

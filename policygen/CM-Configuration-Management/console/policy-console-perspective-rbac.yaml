@@ -16,7 +16,8 @@ spec:
                 verb: list
           state: AccessReview
           
-      # 2. Explicitly disable Developer perspective (even though 4.19+ disables by default)
+      # 2. Developer — tenant container workloads (containers / both).
+      #    Superseded by policy-console-perspective-rbac-vmaas.yaml when VMaaS portal is enabled.
       - id: dev
         visibility:
           state: Disabled

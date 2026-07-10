@@ -5,7 +5,7 @@ object-templates-raw: |
   {{- $tenantName := $tenant.metadata.name }}
   {{- $workloadNs := $tenant.spec.workloadNamespace | default $tenantName }}
   {{- $net := $tenant.spec.network | default dict }}
-  {{- if $net.udnSubnet }}
+  {{- $subnet := $net.udnSubnet | default "10.128.0.0/16" }}
   - complianceType: mustonlyhave
     metadataComplianceType: musthave
     objectDefinition:
@@ -21,7 +21,6 @@ object-templates-raw: |
         layer2:
           role: Primary
           subnets:
-            - "{{ $net.udnSubnet }}"
-  {{- end }}
+            - "{{ $subnet }}"
   {{- end }}
   {{- end }}
