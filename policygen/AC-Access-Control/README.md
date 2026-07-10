@@ -19,6 +19,9 @@ RBAC resources directly from Tenant CRs:
   `acm-vm-extended:{admin,view}` roles scoped to the tenant namespace on managed
   clusters. These are ACM fine-grained RBAC resources evaluated on the hub and
   propagated to matching clusters.
+- **RoleBindings** in `tenancies` for portal markers (`portal-vmaas`, `portal-developer`)
+  that gate VMaaS and Developer perspectives per `spec.workloadProfile`. See
+  [docs/tenant-console-portal.md](../../docs/tenant-console-portal.md).
 
 ### policygenerator-managed.yaml
 

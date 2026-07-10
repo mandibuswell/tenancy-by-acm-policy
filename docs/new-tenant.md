@@ -110,9 +110,9 @@ Each tenant gets a **primary** `UserDefinedNetwork` (UDN) via OVN-Kubernetes. Th
 
 | Parameter      | CRD field            | Description                                                      |
 | -------------- | -------------------- | ---------------------------------------------------------------- |
-| **UDN subnet** | `network.udnSubnet`  | CIDR for this tenant's UDN — **need not be unique** cluster-wide |
+| **UDN subnet** | `network.udnSubnet`  | CIDR for this tenant's UDN — **need not be unique** cluster-wide. **Default `10.128.0.0/16`** if omitted (policy applies the default; override per tenant as needed). |
 
-If `network.udnSubnet` is omitted from the Tenant CR, no UDN is created.
+Every tenant with a matching `workloadProfile` receives a primary UDN and namespace label automatically. Omitting `udnSubnet` from the Tenant CR still provisions a UDN using the default CIDR.
 
 ### 1.7 MetalLB VRF / BGP (external connectivity)
 
@@ -219,20 +219,42 @@ oc get rolebinding -n TENANT
 
 Tenant **workload namespaces exist on managed clusters only** (not on the ACM hub). After SSO login on the hub:
 
-1. Open the **Fleet Management** perspective (requires `acm-vm-fleet:view` on your IdP group — provisioned automatically).
-2. Go to **Virtualization** and select the managed cluster (e.g. `aws-us`).
-3. Open namespace **TENANT** — create or manage VMs there.
+| `workloadProfile` | Console perspectives | Notes |
+|-------------------|---------------------|-------|
+| `vms` or `both` | **VMaaS** (requires `tenant-vmaas-gui` plugin) | Default landing for VM tenants; lists VMs via fleet search |
+| `containers` or `both` | **Developer** | Gated on `portal-developer` marker in `tenancies` |
+| Platform admins | Fleet Management, Admin | Tenants do not see Fleet Management when vmaas perspective policy is active |
 
-Do **not** use the hub **Virtualization** perspective for tenant workloads; that view is hub-local and will not show tenant namespaces.
+**Prerequisites for tenant console access:**
 
-An empty namespace on first login is normal. Seed a starter VM on the managed cluster (cluster-admin kubeconfig):
+1. Hub policies synced: `tenant-portal-markers.yaml`, `hub-tenant-console-rbac.yaml`, `policy-console-perspective-rbac-vmaas.yaml` (see [`docs/tenant-console-portal.md`](tenant-console-portal.md)).
+2. VMaaS plugin deployed: `demo-setups/content/tenant-vmaas-gui/deployment/enable-vmaas.sh` (VM / both tenants).
+3. UDN is provisioned automatically (default `10.128.0.0/16`; override via `spec.network.udnSubnet`).
+
+An empty namespace on first login is normal. Seed a starter VM on the managed cluster:
 
 ```bash
 cd demo-setups/use-cases/acm-tenancy-workloads
-./seed-tenant-vm.sh -t TENANT
+# Direct spoke access (kubeconfig required):
+./seed-tenant-vm.sh -t TENANT -c virtualisation-cluster
+# Imported cluster — hub ManifestWork (no spoke kubeconfig):
+./seed-tenant-vm-via-hub.sh -t TENANT -c virtualisation-cluster
 ```
 
-This deploys a small RHEL9 VM (`TENANT-starter`, `cloud-user` / `redhat`) so tenant admins see at least one VM in the fleet console.
+This deploys a small RHEL9 VM (`TENANT-starter`, `cloud-user` / `redhat`).
+
+### 4.2 Onboarding checklist
+
+| Step | Action |
+|------|--------|
+| 1 | Label managed clusters with capability labels (`tenancy.acm.io/capability-vm` / `capability-container`) |
+| 2 | Create Tenant CR (`workloadProfile`, groups, quotas) |
+| 3 | Optional: override `network.udnSubnet` (default `10.128.0.0/16`) |
+| 4 | Wait for policies Compliant on hub and target spokes |
+| 5 | Keycloak realm + OAuth IdP (if using SSO) |
+| 6 | Seed starter VM (`seed-tenant-vm.sh` or `seed-tenant-vm-via-hub.sh`) |
+| 7 | Deploy VMaaS plugin (`enable-vmaas.sh`) for VM tenants |
+| 8 | Verify tenant login: correct perspectives, no Fleet Management |
 
 ---
 
@@ -252,6 +274,7 @@ On the next policy / reconciler cycle:
 | **KeycloakRealmImport** | Yes | `tenancy-hub-keycloak-realms` uses `pruneObjectBehavior: DeleteAll` |
 | **OAuth IdP** (`{tenant}-idp`) | Yes | Identity reconciler CronJob removes IdPs whose `openshift-{tenant}` client has no Tenant CR |
 | **Client secret** (`openshift-config/{tenant}-client-secret`) | Yes | Reconciler deletes default secret after removing orphan IdP |
+| **Portal RoleBindings** (`tenancies/*-portal-vmaas`, `*-portal-developer`) | Yes | Dropped when tenant leaves `hub-tenant-console-rbac` template range (after Argo sync) |
 | **Custom theme** (ConfigMap + Keycloak mount) | No | Run `apply-themes.sh -d -t TENANT` in the demo repo |
 | **Hub ClusterRoleBindings / MCRAs** | No | AC Application has `prune: false` — remove manually or sync with prune |
 

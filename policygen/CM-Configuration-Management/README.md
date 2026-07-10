@@ -31,7 +31,7 @@ Per-tenant `spec.workloadProfile` defaults to **`vms`**.
 - **ResourceQuota** — **namespace totals** (summed `requests.cpu` / `requests.memory` / pods / PVC storage for every pod). Default **86** CPU, **332Gi** RAM, **15** pods, **2000Gi** storage: room for **10** average VMs (see AAQ) plus a few non-VMI service pods.
 - **ApplicationAwareResourceQuota** (**AAQ**) — **VM workload totals** only (`requests.cpu/vmi`, `requests.memory/vmi`). Default **80** CPU / **320Gi** (10 x 8 vCPU x 32Gi). Complements ResourceQuota; a new VM must fit **both**.
 - **LimitRange** — **max only** for containers and PVCs (no default/min): caps any one VM pod at **8** CPU / **32Gi** and any PVC at **1Ti**; VM and service pods must set their own requests explicitly.
-- **UserDefinedNetwork** providing an L2 overlay subnet per tenant via OVN-Kubernetes (if `network.udnSubnet` is set in the Tenant CR).
+- **UserDefinedNetwork** providing an L2 overlay subnet per tenant via OVN-Kubernetes (default **`10.128.0.0/16`** when `network.udnSubnet` is omitted; overridable per tenant).
 - **MetalLB VRF/BGP** resources (BGPPeer, IPAddressPool, BGPAdvertisement) for
   per-tenant external (north/south) connectivity (if `network.metallb` is set in the Tenant CR).
 
@@ -47,7 +47,7 @@ are applied.
 | `quota/` | `quotas-from-crd.yaml` | `object-templates-raw` — ResourceQuota + LimitRange (containers/both) |
 | `quota/` | `quotas-from-crd-vm.yaml` | `object-templates-raw` — ResourceQuota + AAQ + LimitRange (vms/both) |
 | `quota/` | `hyperconverged-aaq-enabled.yaml` | Enables the AAQ feature gate on HyperConverged |
-| `network/` | `udn-from-crd.yaml` | `object-templates-raw` — creates UserDefinedNetwork per Tenant CR (conditional on spec fields) |
+| `network/` | `udn-from-crd.yaml` | `object-templates-raw` — UserDefinedNetwork per tenant (default `10.128.0.0/16`) |
 | `metallb/` | `bgp-peer-from-crd.yaml` | `object-templates-raw` — creates MetalLB BGPPeer per Tenant CR |
 | `metallb/` | `ip-address-pool-from-crd.yaml` | `object-templates-raw` — creates MetalLB IPAddressPool per Tenant CR |
 | `metallb/` | `bgp-advertisement-from-crd.yaml` | `object-templates-raw` — creates MetalLB BGPAdvertisement per Tenant CR |

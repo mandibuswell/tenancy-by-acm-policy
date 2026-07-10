@@ -29,6 +29,7 @@ policies:
     manifests:
       - path: acm-finegrained-rbac/hub-fleet-crbs.yaml
       - path: acm-finegrained-rbac/hub-mcra-virt.yaml
+      - path: acm-finegrained-rbac/hub-tenant-console-rbac.yaml
 
 policySets:
   - name: tenancy-hub-access-control

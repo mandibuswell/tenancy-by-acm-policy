@@ -273,9 +273,11 @@ spec:
                   properties:
                     udnSubnet:
                       type: string
+                      default: "10.128.0.0/16"
                       description: >-
-                        CIDR for the tenant's primary UDN. May overlap other
-                        tenants — each UDN is a fully isolated logical network.
+                        CIDR for the tenant's primary UDN. Defaults to 10.128.0.0/16 when
+                        omitted. May overlap other tenants — each UDN is a fully isolated
+                        logical network.
                     metallb:
                       type: object
                       description: >-
