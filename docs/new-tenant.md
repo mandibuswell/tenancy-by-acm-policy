@@ -180,13 +180,13 @@ Once the Tenant CR is created, the policy evaluation cycle produces the followin
    - UserDefinedNetwork (if `network.udnSubnet` is set)
    - MetalLB BGPPeer, IPAddressPool, BGPAdvertisement (if `network.metallb` is set)
    - RoleBindings for Tenant-Admin, Tenant-User and Tenant-Viewer groups
-5. **Hub Keycloak policy** (`tenancy-hub-keycloak-realms`, when `manageRealm` and `seedUsers` are true) bootstraps demo users:
+5. **Hub Keycloak policy** (`tenancy-hub-keycloak-realms`, when `manageRealm` and `seedUsers` are true) bootstraps demo users (display name last name = title-cased tenant, e.g. `Admin Lexx`):
 
-   | Username | Password | Group |
-   |----------|----------|-------|
-   | `admin@<tenant>.local` | `spec.identity.keycloak.seedPassword` (default `password`) | `<tenant>-tenant-admin` |
-   | `user@<tenant>.local` | same | `<tenant>-tenant-user` |
-   | `viewer@<tenant>.local` | same | `<tenant>-tenant-viewer` (if `viewerGroup` set) |
+   | Username | Display name | Password | Group |
+   |----------|--------------|----------|-------|
+   | `admin@<tenant>.local` | `Admin <Tenant>` | `spec.identity.keycloak.seedPassword` (default `password`) | `<tenant>-tenant-admin` |
+   | `user@<tenant>.local` | `User <Tenant>` | same | `<tenant>-tenant-user` |
+   | `viewer@<tenant>.local` | `Viewer <Tenant>` | same | `<tenant>-tenant-viewer` (if `viewerGroup` set) |
 
    Set `requirePasswordChange: true` to force a password change on first login.
 

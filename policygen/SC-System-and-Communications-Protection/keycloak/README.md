@@ -45,13 +45,13 @@ See [`examples/tenant-gigashadow-identity.yaml`](../../../examples/tenant-gigash
 
 ## Seed users
 
-When `manageRealm` and `seedUsers` are both true, each tenant realm is bootstrapped with demo users:
+When `manageRealm` and `seedUsers` are both true, each tenant realm is bootstrapped with demo users. Console display names use the tenant name as the last name (for example `Admin Lexx`, `User Firefly`) so IdP pickers are easy to tell apart:
 
-| Username | Group | Default password |
-|----------|-------|------------------|
-| `admin@<tenant>.local` | `<tenant>-tenant-admin` | `spec.identity.keycloak.seedPassword` (default `password`) |
-| `user@<tenant>.local` | `<tenant>-tenant-user` | same |
-| `viewer@<tenant>.local` | `<tenant>-tenant-viewer` | same |
+| Username | Display name | Group | Default password |
+|----------|--------------|-------|------------------|
+| `admin@<tenant>.local` | `Admin <Tenant>` | `<tenant>-tenant-admin` | `spec.identity.keycloak.seedPassword` (default `password`) |
+| `user@<tenant>.local` | `User <Tenant>` | `<tenant>-tenant-user` | same |
+| `viewer@<tenant>.local` | `Viewer <Tenant>` | `<tenant>-tenant-viewer` | same |
 
 Set `requirePasswordChange: true` to force a password change on first login (Keycloak `temporary` credential).
 

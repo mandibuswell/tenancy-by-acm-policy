@@ -75,11 +75,12 @@ object-templates-raw: |
               - name: {{ $tenant.spec.viewerGroup }}
               {{- end }}
           {{- if $seedUsers }}
+          {{- $displayLast := $name | title }}
           users:
             - username: admin@{{ $name }}.local
               enabled: true
               firstName: Admin
-              lastName: Default
+              lastName: {{ $displayLast }}
               groups:
                 - /{{ $tenant.spec.adminGroup }}
               credentials:
@@ -89,7 +90,7 @@ object-templates-raw: |
             - username: user@{{ $name }}.local
               enabled: true
               firstName: User
-              lastName: Default
+              lastName: {{ $displayLast }}
               groups:
                 - /{{ $tenant.spec.userGroup }}
               credentials:
@@ -100,7 +101,7 @@ object-templates-raw: |
             - username: viewer@{{ $name }}.local
               enabled: true
               firstName: Viewer
-              lastName: Default
+              lastName: {{ $displayLast }}
               groups:
                 - /{{ $tenant.spec.viewerGroup }}
               credentials:
