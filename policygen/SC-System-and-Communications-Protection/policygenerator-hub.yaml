@@ -50,6 +50,14 @@ policies:
     manifests:
       - path: keycloak/identity-reconciler.yaml
 
+  - name: tenancy-hub-vm-seed-reconciler
+    controls:
+      - Seed Starter VMs for VM Tenants
+    dependencies:
+      - name: tenancy-hub-tenant-crd
+    manifests:
+      - path: tenancy/seed-vm-reconciler.yaml
+
 policySets:
   - name: tenancy-hub-tenant-definition
     description: "Hub Tenant CRD and tenancies namespace -- foundation for all tenant policies"

@@ -1,0 +1,315 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tenant-vm-seed-reconciler
+  namespace: tenancies
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-vm-seed-reconciler
+rules:
+  - apiGroups: ["dusty-seahorse.io"]
+    resources: ["tenants"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["dusty-seahorse.io"]
+    resources: ["tenants/status"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["managedclusters"]
+    verbs: ["get", "list"]
+  - apiGroups: ["work.open-cluster-management.io"]
+    resources: ["manifestworks"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tenant-vm-seed-reconciler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tenant-vm-seed-reconciler
+subjects:
+  - kind: ServiceAccount
+    name: tenant-vm-seed-reconciler
+    namespace: tenancies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-vm-seed-reconciler-script
+  namespace: tenancies
+data:
+  reconcile.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if ! command -v jq >/dev/null 2>&1; then
+      case "$(uname -m)" in
+        x86_64) jq_bin=jq-linux-amd64 ;;
+        aarch64|arm64) jq_bin=jq-linux-arm64 ;;
+        *) echo "unsupported architecture for jq bootstrap: $(uname -m)" >&2; exit 1 ;;
+      esac
+      curl -fsSL -o /tmp/jq "https://github.com/jqlang/jq/releases/download/jq-1.7.1/${jq_bin}"
+      chmod +x /tmp/jq
+      export PATH="/tmp:${PATH}"
+    fi
+
+    DEFAULT_CLUSTER="${DEFAULT_CLUSTER:-virtualisation-cluster}"
+    DEFAULT_CPU="${DEFAULT_CPU:-1}"
+    DEFAULT_MEMORY="${DEFAULT_MEMORY:-2Gi}"
+    DEFAULT_DISK="${DEFAULT_DISK:-30Gi}"
+
+    patch_status() {
+      local ns=$1 name=$2 payload=$3
+      oc patch tenant "$name" -n "$ns" --subresource=status --type=merge -p "$payload" 2>/dev/null || true
+    }
+
+    resolve_cluster() {
+      local wanted=$1
+      if [ -n "$wanted" ] && oc get managedcluster "$wanted" &>/dev/null; then
+        echo "$wanted"
+        return 0
+      fi
+      if oc get managedcluster "$DEFAULT_CLUSTER" &>/dev/null; then
+        echo "$DEFAULT_CLUSTER"
+        return 0
+      fi
+      oc get managedcluster -o json | jq -r '
+        .items[]
+        | select(.metadata.labels["tenancy.acm.io/capability-vm"] == "true")
+        | select([.status.conditions[]? | select(.type=="ManagedClusterConditionAvailable" and .status=="True")] | length > 0)
+        | .metadata.name' | head -1
+    }
+
+    apply_manifestwork() {
+      local cluster=$1 mw=$2 ns=$3 vm=$4 cpu=$5 memory=$6 disk=$7 tenant=$8
+      local cpu_num
+      cpu_num=$(echo "$cpu" | tr -cd '0-9')
+      [ -z "$cpu_num" ] && cpu_num=1
+      jq -n \
+        --arg cluster "$cluster" \
+        --arg mw "$mw" \
+        --arg ns "$ns" \
+        --arg vm "$vm" \
+        --arg memory "$memory" \
+        --arg disk "$disk" \
+        --arg tenant "$tenant" \
+        --argjson cpu "$cpu_num" \
+        '{
+          apiVersion: "work.open-cluster-management.io/v1",
+          kind: "ManifestWork",
+          metadata: {
+            name: $mw,
+            namespace: $cluster,
+            labels: {
+              "tenancy.acm.io/seed-vm": "true",
+              "tenancy.acm.io/tenant": $tenant
+            }
+          },
+          spec: {
+            manifestConfigs: [{
+              resourceIdentifier: {
+                group: "kubevirt.io",
+                resource: "virtualmachines",
+                name: $vm,
+                namespace: $ns
+              },
+              feedbackRules: [{
+                type: "JSONPaths",
+                jsonPaths: [{ path: ".status.printableStatus", name: "printableStatus" }]
+              }]
+            }],
+            workload: {
+              manifests: [{
+                apiVersion: "kubevirt.io/v1",
+                kind: "VirtualMachine",
+                metadata: {
+                  name: $vm,
+                  namespace: $ns,
+                  labels: {
+                    app: $vm,
+                    tenant: $tenant,
+                    "vm.kubevirt.io/template": "rhel9-server-small",
+                    "vm.kubevirt.io/template.namespace": "openshift"
+                  }
+                },
+                spec: {
+                  runStrategy: "Always",
+                  template: {
+                    metadata: {
+                      labels: {
+                        "kubevirt.io/domain": $vm,
+                        "kubevirt.io/size": "small"
+                      }
+                    },
+                    spec: {
+                      domain: {
+                        cpu: { cores: $cpu, sockets: 1, threads: 1 },
+                        devices: {
+                          disks: [
+                            { disk: { bus: "virtio" }, name: "rootdisk" },
+                            { disk: { bus: "virtio" }, name: "cloudinitdisk" }
+                          ],
+                          interfaces: [{ masquerade: {}, name: "default" }],
+                          rng: {}
+                        },
+                        resources: { requests: { memory: $memory } }
+                      },
+                      networks: [{ name: "default", pod: {} }],
+                      terminationGracePeriodSeconds: 180,
+                      volumes: [
+                        { dataVolume: { name: ($vm + "-rootdisk") }, name: "rootdisk" },
+                        {
+                          cloudInitNoCloud: {
+                            userData: ("#cloud-config\nuser: cloud-user\npassword: redhat\nchpasswd:\n  expire: false\nhostname: " + $vm + "\n")
+                          },
+                          name: "cloudinitdisk"
+                        }
+                      ]
+                    }
+                  },
+                  dataVolumeTemplates: [{
+                    metadata: { name: ($vm + "-rootdisk") },
+                    spec: {
+                      sourceRef: {
+                        kind: "DataSource",
+                        name: "rhel9",
+                        namespace: "openshift-virtualization-os-images"
+                      },
+                      storage: {
+                        resources: { requests: { storage: $disk } }
+                      }
+                    }
+                  }]
+                }
+              }]
+            }
+          }
+        }' | oc apply -f -
+    }
+
+    cleanup_orphan_manifestworks() {
+      local tenants
+      tenants=$(oc get tenants -A -o json 2>/dev/null || echo '{"items":[]}')
+      oc get manifestwork -A -l tenancy.acm.io/seed-vm=true -o json 2>/dev/null \
+        | jq -c '.items[]?' | while read -r mw; do
+          [ -z "$mw" ] && continue
+          local mwn mwc tenant
+          mwn=$(echo "$mw" | jq -r '.metadata.name')
+          mwc=$(echo "$mw" | jq -r '.metadata.namespace')
+          tenant=$(echo "$mw" | jq -r '.metadata.labels["tenancy.acm.io/tenant"] // empty')
+          if [ -z "$tenant" ]; then
+            continue
+          fi
+          if ! echo "$tenants" | jq -e --arg t "$tenant" '
+            .items[] | select(.metadata.name == $t)
+          ' >/dev/null 2>&1; then
+            echo "Deleting orphan ManifestWork ${mwc}/${mwn} for deleted tenant ${tenant}"
+            oc delete manifestwork "$mwn" -n "$mwc" --ignore-not-found
+          fi
+        done
+    }
+
+    TENANTS_JSON=$(oc get tenants -A -o json)
+    echo "$TENANTS_JSON" | jq -c '.items[]?' | while read -r item; do
+      [ -z "$item" ] && continue
+      NS=$(echo "$item" | jq -r '.metadata.namespace')
+      NAME=$(echo "$item" | jq -r '.metadata.name')
+      PROFILE=$(echo "$item" | jq -r '.spec.workloadProfile // "vms"')
+      WANTS_VM=false
+      case "$PROFILE" in
+        vms|both) WANTS_VM=true ;;
+      esac
+
+      SEED_JSON=$(echo "$item" | jq -c '.spec.seedStarterVm // {}')
+      ENABLED_RAW=$(echo "$SEED_JSON" | jq -r '.enabled // empty')
+
+      if [ "$WANTS_VM" != "true" ]; then
+        patch_status "$NS" "$NAME" '{"status":{"seedVm":{"phase":"Skipped","message":"workloadProfile does not include VMs"}}}'
+        continue
+      fi
+
+      # Default ON for vms/both when seedStarterVm.enabled is omitted
+      if [ "$ENABLED_RAW" = "false" ]; then
+        patch_status "$NS" "$NAME" '{"status":{"seedVm":{"phase":"Disabled","message":"seedStarterVm.enabled is false"}}}'
+        continue
+      fi
+
+      CLUSTER_WANTED=$(echo "$SEED_JSON" | jq -r '.cluster // empty')
+      VM_NAME=$(echo "$SEED_JSON" | jq -r --arg t "$NAME" '.vmName // "\($t)-starter"')
+      CPU=$(echo "$SEED_JSON" | jq -r --arg d "$DEFAULT_CPU" '.cpu // $d')
+      MEMORY=$(echo "$SEED_JSON" | jq -r --arg d "$DEFAULT_MEMORY" '.memory // $d')
+      DISK=$(echo "$SEED_JSON" | jq -r --arg d "$DEFAULT_DISK" '.disk // $d')
+      WORKLOAD_NS=$(echo "$item" | jq -r --arg t "$NAME" '.spec.workloadNamespace // $t')
+      MW_NAME="seed-${VM_NAME}-vm"
+
+      CLUSTER=$(resolve_cluster "$CLUSTER_WANTED")
+      if [ -z "$CLUSTER" ]; then
+        STATUS=$(jq -nc --arg msg "No VM-capable managed cluster found" --arg vm "$VM_NAME" \
+          '{status:{seedVm:{phase:"Error",message:$msg,vmName:$vm}}}')
+        patch_status "$NS" "$NAME" "$STATUS"
+        echo "Tenant ${NAME}: no cluster"
+        continue
+      fi
+
+      if ! apply_manifestwork "$CLUSTER" "$MW_NAME" "$WORKLOAD_NS" "$VM_NAME" "$CPU" "$MEMORY" "$DISK" "$NAME"; then
+        STATUS=$(jq -nc \
+          --arg cluster "$CLUSTER" --arg vm "$VM_NAME" --arg mw "$MW_NAME" \
+          '{status:{seedVm:{phase:"Error",message:"Failed to apply ManifestWork",cluster:$cluster,vmName:$vm,manifestWork:$mw}}}')
+        patch_status "$NS" "$NAME" "$STATUS"
+        continue
+      fi
+
+      PRINTABLE=$(oc get manifestwork "$MW_NAME" -n "$CLUSTER" \
+        -o jsonpath='{.status.resourceStatus.manifests[0].statusFeedback.values[?(@.name=="printableStatus")].fieldValue.string}' \
+        2>/dev/null || true)
+      PHASE="Pending"
+      MSG="ManifestWork applied"
+      if [ "$PRINTABLE" = "Running" ]; then
+        PHASE="Ready"
+        MSG="Starter VM is Running"
+      elif [ -n "$PRINTABLE" ]; then
+        MSG="VM status: ${PRINTABLE}"
+      fi
+
+      STATUS=$(jq -nc \
+        --arg phase "$PHASE" --arg msg "$MSG" --arg cluster "$CLUSTER" \
+        --arg vm "$VM_NAME" --arg mw "$MW_NAME" --arg ps "$PRINTABLE" \
+        '{status:{seedVm:{phase:$phase,message:$msg,cluster:$cluster,vmName:$vm,manifestWork:$mw,printableStatus:$ps}}}')
+      patch_status "$NS" "$NAME" "$STATUS"
+      echo "Reconciled tenant ${NAME} seed VM ${VM_NAME} on ${CLUSTER} (${PHASE})"
+    done
+
+    cleanup_orphan_manifestworks
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tenant-vm-seed-reconciler
+  namespace: tenancies
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: tenant-vm-seed-reconciler
+          restartPolicy: OnFailure
+          containers:
+            - name: reconcile
+              image: quay.io/openshift/origin-cli:4.14
+              command: ["/scripts/reconcile.sh"]
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+          volumes:
+            - name: scripts
+              configMap:
+                name: tenant-vm-seed-reconciler-script
+                defaultMode: 0755

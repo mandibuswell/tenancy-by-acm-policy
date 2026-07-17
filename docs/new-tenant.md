@@ -180,13 +180,13 @@ Once the Tenant CR is created, the policy evaluation cycle produces the followin
    - UserDefinedNetwork (if `network.udnSubnet` is set)
    - MetalLB BGPPeer, IPAddressPool, BGPAdvertisement (if `network.metallb` is set)
    - RoleBindings for Tenant-Admin, Tenant-User and Tenant-Viewer groups
-5. **Hub Keycloak policy** (`tenancy-hub-keycloak-realms`, when `manageRealm` and `seedUsers` are true) bootstraps demo users:
+5. **Hub Keycloak policy** (`tenancy-hub-keycloak-realms`, when `manageRealm` and `seedUsers` are true) bootstraps demo users (display name last name = title-cased tenant, e.g. `Admin Lexx`):
 
-   | Username | Password | Group |
-   |----------|----------|-------|
-   | `admin@<tenant>.local` | `spec.identity.keycloak.seedPassword` (default `password`) | `<tenant>-tenant-admin` |
-   | `user@<tenant>.local` | same | `<tenant>-tenant-user` |
-   | `viewer@<tenant>.local` | same | `<tenant>-tenant-viewer` (if `viewerGroup` set) |
+   | Username | Display name | Password | Group |
+   |----------|--------------|----------|-------|
+   | `admin@<tenant>.local` | `Admin <Tenant>` | `spec.identity.keycloak.seedPassword` (default `password`) | `<tenant>-tenant-admin` |
+   | `user@<tenant>.local` | `User <Tenant>` | same | `<tenant>-tenant-user` |
+   | `viewer@<tenant>.local` | `Viewer <Tenant>` | same | `<tenant>-tenant-viewer` (if `viewerGroup` set) |
 
    Set `requirePasswordChange: true` to force a password change on first login.
 
@@ -231,17 +231,18 @@ Tenant **workload namespaces exist on managed clusters only** (not on the ACM hu
 2. VMaaS plugin deployed: `demo-setups/content/tenant-vmaas-gui/deployment/enable-vmaas.sh` (VM / both tenants).
 3. UDN is provisioned automatically (default `10.128.0.0/16`; override via `spec.network.udnSubnet`).
 
-An empty namespace on first login is normal. Seed a starter VM on the managed cluster:
+Starter VMs are provisioned automatically for `vms` / `both` tenants when
+`spec.seedStarterVm.enabled` is true (the default). The hub **tenant-vm-seed-reconciler**
+CronJob creates a ManifestWork with a RHEL9 starter VM (`TENANT-starter`,
+`cloud-user` / `redhat`). Opt out with `seedStarterVm.enabled: false` or uncheck
+**Provision starter VM automatically** in the Create Tenant form.
+
+Manual override (or retry) if needed:
 
 ```bash
 cd demo-setups/use-cases/acm-tenancy-workloads
-# Direct spoke access (kubeconfig required):
-./seed-tenant-vm.sh -t TENANT -c virtualisation-cluster
-# Imported cluster — hub ManifestWork (no spoke kubeconfig):
 ./seed-tenant-vm-via-hub.sh -t TENANT -c virtualisation-cluster
 ```
-
-This deploys a small RHEL9 VM (`TENANT-starter`, `cloud-user` / `redhat`).
 
 ### 4.2 Onboarding checklist
 
@@ -252,7 +253,7 @@ This deploys a small RHEL9 VM (`TENANT-starter`, `cloud-user` / `redhat`).
 | 3 | Optional: override `network.udnSubnet` (default `10.128.0.0/16`) |
 | 4 | Wait for policies Compliant on hub and target spokes |
 | 5 | Keycloak realm + OAuth IdP (if using SSO) |
-| 6 | Seed starter VM (`seed-tenant-vm.sh` or `seed-tenant-vm-via-hub.sh`) |
+| 6 | Starter VM — automatic via seed reconciler when `seedStarterVm` enabled (default for vms/both) |
 | 7 | Deploy VMaaS plugin (`enable-vmaas.sh`) for VM tenants |
 | 8 | Verify tenant login: correct perspectives, no Fleet Management |
 
