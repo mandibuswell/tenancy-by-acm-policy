@@ -23,6 +23,16 @@ metadata:
 data:
   description: Marker for Developer perspective access (containers / both tenants)
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: portal-caas
+  namespace: tenancies
+  labels:
+    tenancy.demo/portal: caas
+data:
+  description: Marker for Cluster-as-a-Service portal access (clusters tenants)
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -43,4 +53,15 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     resourceNames: ["portal-developer"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tenant-portal-caas
+  namespace: tenancies
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["portal-caas"]
     verbs: ["get"]

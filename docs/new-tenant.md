@@ -20,7 +20,7 @@ Fill in the table below before creating the Tenant CR. All fields except `adminG
 | **Tenant label**   | All provisioned objects carry `tenant: <name>` for selection and auditing                                         | `tenant: starwars`   |
 | **Tenant name**    | Tenant CR name and default workload namespace on managed clusters; prefix for groups, MetalLB, realms | `starwars`           |
 | **Workload namespace** | Optional override for the managed-cluster namespace (`spec.workloadNamespace`). Defaults to tenant name. Use `{tenant}-ns` if you want a suffix. | `starwars` or `starwars-ns` |
-| **Workload profile** | What to provision: `vms` (default), `containers`, or `both` | `vms` |
+| **Workload profile** | What to provision: `vms` (default), `containers`, `both`, or `clusters` (CaaS / HCP) | `vms` or `clusters` |
 | **Tenant-Admin group**    | IdP group granted `admin` in the namespace + `kubevirt.io:admin` on VMs + `acm-vm-fleet:view` on the hub console  | `starwars-tenant-admin`  |
 | **Tenant-User group**     | IdP group granted `edit` in the namespace + `kubevirt.io:edit` on VMs + `acm-vm-fleet:view` on the hub console    | `starwars-tenant-user`   |
 | **Tenant-Viewer group**   | IdP group granted `view` in the namespace + `kubevirt.io:view` on VMs + `acm-vm-fleet:view` on the hub console    | `starwars-tenant-viewer` |
@@ -37,6 +37,17 @@ Roles are fixed per group tier:
 
 
 The `viewerGroup` field is optional. If omitted, no viewer-tier resources are created. If you only need one group, remove the unused tiers from the Tenant CR.
+
+### 1.2a Cluster-as-a-Service (`workloadProfile: clusters`)
+
+For HCP / CaaS tenants:
+
+- Hub policy creates namespace `{tenant}-hcp` (override with `spec.clusterAsAService.hcpNamespace`) and a hub ResourceQuota (defaults: 40 CPU / 64Gi / 100 pods).
+- Spoke VM namespaces, AAQ, virt MCRAs, `acm-vm-fleet:view`, and VMaaS portal bindings are **not** applied.
+- Portal marker `portal-caas` is bound for future CaaS console UI.
+- Example: [`examples/tenant-acme-caas.yaml`](../examples/tenant-acme-caas.yaml).
+
+HostedCluster automation is a follow-on (Slice B). For a customer who also needs VMs, create a **second** Tenant CR (e.g. `acme-vms`) and optionally reuse IdP/groups (Slice C).
 
 ### 1.2 ResourceQuota vs ApplicationAwareResourceQuota vs LimitRange
 
@@ -223,6 +234,7 @@ Tenant **workload namespaces exist on managed clusters only** (not on the ACM hu
 |-------------------|---------------------|-------|
 | `vms` or `both` | **VMaaS** (requires `tenant-vmaas-gui` plugin) | Default landing for VM tenants; lists VMs via fleet search |
 | `containers` or `both` | **Developer** | Gated on `portal-developer` marker in `tenancies` |
+| `clusters` | **CaaS** marker (`portal-caas`) | Hub `{tenant}-hcp` namespace; no spoke VM quotas / virt MCRAs / VMaaS. Console plugin TBD |
 | Platform admins | Fleet Management, Admin | Tenants do not see Fleet Management when vmaas perspective policy is active |
 
 **Prerequisites for tenant console access:**

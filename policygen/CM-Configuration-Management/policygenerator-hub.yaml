@@ -27,6 +27,11 @@ policies:
   #     - Enforce Cross-Tenant Network Deny
   #   manifests:
   #     - path: network-policy/admin-network-policy.yaml
+  - name: tenancy-hub-caas-hcp-namespaces
+    controls:
+      - Provision Tenant Resources
+    manifests:
+      - path: namespace/hub-hcp-namespaces-from-crd.yaml
   - name: tenancy-hub-console-perspective-visibility
     controls:
       - Enforce ACM Console Perspective Visibility
