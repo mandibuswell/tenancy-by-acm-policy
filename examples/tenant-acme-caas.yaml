@@ -20,26 +20,15 @@ spec:
   userGroup: acme-tenant-user
   viewerGroup: acme-tenant-viewer
   workloadProfile: clusters
-  # Spoke VM/container quotas are ignored for clusters; hub HCP quota is below.
-  resourceQuota:
-    cpu: "1"
-    memory: "1Gi"
-    pods: "1"
-    storage: "1Gi"
-  vmQuota:
-    cpu: "0"
-    memory: "0"
-  limitRange:
-    maxCpu: "1"
-    maxMemory: "1Gi"
-    maxStorage: "1Gi"
+  # Spoke VM/container quotas omitted — CaaS uses hub HCP quota below.
+  # Administrators may still set resourceQuota / vmQuota / limitRange if desired.
   clusterAsAService:
     # Defaults to acme-caas-hcp when omitted
     # hcpNamespace: acme-caas-hcp
     hubResourceQuota:
-      cpu: "40"
-      memory: "64Gi"
-      pods: "100"
+      cpu: "12"
+      memory: "32Gi"
+      pods: "150"
   identity:
     enabled: true
     provider: keycloak

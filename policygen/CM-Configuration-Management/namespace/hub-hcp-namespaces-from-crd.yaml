@@ -9,9 +9,9 @@ object-templates-raw: |
   {{- $caas := $tenant.spec.clusterAsAService | default (dict) }}
   {{- $hcpNs := $caas.hcpNamespace | default (printf "%s-hcp" $tenantName) }}
   {{- $rq := $caas.hubResourceQuota | default (dict) }}
-  {{- $cpu := $rq.cpu | default "40" }}
-  {{- $memory := $rq.memory | default "64Gi" }}
-  {{- $pods := $rq.pods | default "100" }}
+  {{- $cpu := $rq.cpu | default "12" }}
+  {{- $memory := $rq.memory | default "32Gi" }}
+  {{- $pods := $rq.pods | default "150" }}
   - complianceType: musthave
     metadataComplianceType: musthave
     objectDefinition:

@@ -42,7 +42,7 @@ The `viewerGroup` field is optional. If omitted, no viewer-tier resources are cr
 
 For HCP / CaaS tenants:
 
-- Hub policy creates namespace `{tenant}-hcp` (override with `spec.clusterAsAService.hcpNamespace`) and a hub ResourceQuota (defaults: 40 CPU / 64Gi / 100 pods).
+- Hub policy creates namespace `{tenant}-hcp` (override with `spec.clusterAsAService.hcpNamespace`) and a hub ResourceQuota sized for **one HA HCP** (defaults: 12 CPU / 32Gi / 150 pods).
 - Spoke VM namespaces, AAQ, virt MCRAs, `acm-vm-fleet:view`, and VMaaS portal bindings are **not** applied.
 - Portal marker `portal-caas` is bound for future CaaS console UI.
 - Example: [`examples/tenant-acme-caas.yaml`](../examples/tenant-acme-caas.yaml).
