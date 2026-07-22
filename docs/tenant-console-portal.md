@@ -1,4 +1,4 @@
-# Tenant console portal (VMaaS + Developer)
+# Tenant console portal (VMaaS + Developer + CaaS)
 
 Hub policies that control **which console perspectives** tenant IdP groups see, independent of Fleet Management and platform admin views.
 
@@ -10,6 +10,7 @@ Each portal capability uses a **marker ConfigMap** in `tenancies` and a **RoleBi
 |--------|------|------------------------------|----------------|
 | `portal-vmaas` | `tenant-portal-vmaas` | `vms`, `both` | VMaaS plugin perspective (default landing) |
 | `portal-developer` | `tenant-portal-developer` | `containers`, `both` | OpenShift **Developer** perspective (non-admins only) |
+| `portal-caas` | `tenant-portal-caas` | `clusters` | CaaS portal marker (console plugin / perspective TBD) |
 
 **Split from Fleet Management:** `acm` (Fleet Management) requires `clusteroperators` list (platform only). Tenants keep `acm-vm-fleet:view` for fleet VM API/search; portal visibility is separate.
 
@@ -23,11 +24,16 @@ Each portal capability uses a **marker ConfigMap** in `tenancies` and a **RoleBi
 
 ## Workload profiles
 
-| Profile | VMaaS default | Developer | Fleet API (`acm-vm-fleet:view`) |
-|---------|---------------|-----------|-----------------------------------|
-| `vms` | Yes | No | Yes |
-| `containers` | No | Yes | No |
-| `both` | Yes (default) | Yes | Yes |
+| Profile | VMaaS default | Developer | CaaS marker | Fleet API (`acm-vm-fleet:view`) | Hub HCP ns |
+|---------|---------------|-----------|-------------|-------------------------------|------------|
+| `vms` | Yes | No | No | Yes | No |
+| `containers` | No | Yes | No | No | No |
+| `both` | Yes (default) | Yes | No | Yes | No |
+| `clusters` | No | No | Yes | No | `{tenant}-hcp` |
+
+## Cluster-as-a-Service notes
+
+For `workloadProfile: clusters`, hub policy `tenancy-hub-caas-hcp-namespaces` creates `{tenant}-hcp` (override via `spec.clusterAsAService.hcpNamespace`) with a ResourceQuota. Spoke VM namespaces, AAQ, virt MCRAs, and VMaaS portal bindings are not applied.
 
 ## Future: tenant admin observability
 

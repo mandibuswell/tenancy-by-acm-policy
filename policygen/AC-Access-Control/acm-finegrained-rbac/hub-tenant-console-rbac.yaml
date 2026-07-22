@@ -118,4 +118,62 @@ object-templates-raw: |
           name: {{ $tenant.spec.viewerGroup }}
   {{- end }}
   {{- end }}
+  {{- if eq $profile "clusters" }}
+  - complianceType: mustonlyhave
+    metadataComplianceType: musthave
+    objectDefinition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: {{ $tenantName }}-tenant-admin-portal-caas
+        namespace: tenancies
+        labels:
+          tenant: {{ $tenantName | quote }}
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: tenant-portal-caas
+      subjects:
+        - kind: Group
+          apiGroup: rbac.authorization.k8s.io
+          name: {{ $tenant.spec.adminGroup }}
+  - complianceType: mustonlyhave
+    metadataComplianceType: musthave
+    objectDefinition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: {{ $tenantName }}-tenant-user-portal-caas
+        namespace: tenancies
+        labels:
+          tenant: {{ $tenantName | quote }}
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: tenant-portal-caas
+      subjects:
+        - kind: Group
+          apiGroup: rbac.authorization.k8s.io
+          name: {{ $tenant.spec.userGroup }}
+  {{- if $tenant.spec.viewerGroup }}
+  - complianceType: mustonlyhave
+    metadataComplianceType: musthave
+    objectDefinition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: {{ $tenantName }}-tenant-viewer-portal-caas
+        namespace: tenancies
+        labels:
+          tenant: {{ $tenantName | quote }}
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: tenant-portal-caas
+      subjects:
+        - kind: Group
+          apiGroup: rbac.authorization.k8s.io
+          name: {{ $tenant.spec.viewerGroup }}
+  {{- end }}
+  {{- end }}
   {{- end }}
