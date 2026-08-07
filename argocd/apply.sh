@@ -51,7 +51,8 @@ apply() {
         content=$(echo "$content" | sed "s|targetRevision: ${DEFAULT_REV}|targetRevision: ${BRANCH}|")
     fi
     if [[ "$REPO_URL" != "$DEFAULT_REPO" ]]; then
-        content=$(echo "$content" | sed "s|repoURL: ${DEFAULT_REPO}|repoURL: ${REPO_URL}|g")
+        # YAML may use repoURL with or without a trailing .git
+        content=$(echo "$content" | sed -E "s|repoURL: ${DEFAULT_REPO}(\.git)?|repoURL: ${REPO_URL}|g")
     fi
     echo "$content" | oc apply -f -
 }
@@ -78,3 +79,4 @@ apply "$SCRIPT_DIR/application-tenancy-system-and-communications-protection.yaml
 
 echo
 echo "==> Done. Applications track $REPO_URL @ $BRANCH"
+echo "    Override with TENANCY_POLICY_REPO_URL / TENANCY_POLICY_BRANCH (or pass branch as \$1)."

@@ -1,15 +1,53 @@
 # Tenant CRs
 
-Sample tenants are **not** applied from this directory anymore.
+This directory is synced by Argo CD Application **`tenancy-base`** and is
+**intentionally empty**. Sample tenants are **not** GitOps-managed here.
 
-Create tenants via the **Create Tenant** console plugin (`/tenant-create`) or `oc apply -f` on a manifest you author yourself.
+## Why empty + prune false
 
-Reference examples (not auto-deployed):
+| Setting | Value | Reason |
+|---------|-------|--------|
+| `tenancies/` contents | empty | Create Tenant UI (or example YAML) owns Tenant CRs |
+| `tenancy-base` `automated.prune` | **false** | Empty Git + prune would delete any live Tenant CRs |
 
-- [`examples/tenant-starwars.yaml`](../examples/tenant-starwars.yaml)
-- [`examples/tenant-startrek.yaml`](../examples/tenant-startrek.yaml)
+Do **not** commit starwars/startrek into this folder unless you deliberately want Argo to own them.
+
+## How to provision sample tenants
+
+**After** Keycloak is Ready (`./bin/apply acm-tenancy-keycloak`):
+
+```bash
+# Workshop / fast path — golden SSO examples
+content/tenancy-by-acm-policy/examples/apply-samples.sh
+
+# Or one at a time
+oc apply -f content/tenancy-by-acm-policy/examples/tenant-starwars.yaml
+oc apply -f content/tenancy-by-acm-policy/examples/tenant-startrek.yaml
+
+# Or live demo — Create Tenant in the ACM console (/tenant-create) with SSO enabled
+```
+
+Reference examples:
+
+- [`examples/tenant-starwars.yaml`](../examples/tenant-starwars.yaml) — `workloadProfile: vms` + Keycloak SSO
+- [`examples/tenant-startrek.yaml`](../examples/tenant-startrek.yaml) — same
 - [`examples/tenant-gigashadow-identity.yaml`](../examples/tenant-gigashadow-identity.yaml)
 
-Each Tenant CR provisions a **workload namespace** on managed clusters (`spec.workloadNamespace`, defaulting to the tenant name) with label `tenant: <name>`.
+Each example includes an `openshift-config` client secret plus `spec.identity`
+(`manageRealm` + `seedUsers`). Do **not** use HTPasswd (`09-tenant-users` /
+`10-tenant-groups`) for this path — groups come from Keycloak OIDC claims.
 
-**Argo CD `tenancy-base`** syncs the `tenancies/` directory. It is **empty by default** (no auto-deployed starwars/startrek). If your cluster still recreates sample tenants, check that `tenancy-base` tracks your fork/branch — run `argocd/apply.sh` from this repo so `repoURL` and `targetRevision` match your clone.
+ACM policies then provision namespaces, quotas, UDN, MetalLB, Keycloak realms,
+OAuth IdPs, and (by default) a starter VM.
+
+## Argo source
+
+Point apps at your fork when developing:
+
+```bash
+export TENANCY_POLICY_REPO_URL=https://github.com/mandibuswell/tenancy-by-acm-policy
+export TENANCY_POLICY_BRANCH=master
+cd content/tenancy-by-acm-policy && ./argocd/apply.sh
+```
+
+`use-cases/acm-tenancy/apply.sh` defaults to that fork for demos.

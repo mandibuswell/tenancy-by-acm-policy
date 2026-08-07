@@ -1,10 +1,8 @@
 ---
-
-## This application renders the Tenant CRD and optional GitOps-managed Tenant CRs.
-# tenancies/kustomization.yaml is intentionally empty — create tenants via the
-# Create Tenant console plugin or oc apply -f examples/tenant-*.yaml.
-# With prune enabled, removing a Tenant from this path deletes it from the cluster.
-
+# tenancy-base syncs tenancies/ which is intentionally empty.
+# Sample tenants are NOT GitOps-managed — create via Create Tenant UI or:
+#   examples/apply-samples.sh
+# prune must stay false: with an empty path, prune:true deletes any live Tenant CRs.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -24,5 +22,5 @@ spec:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
     automated:
-      prune: true
+      prune: false
       selfHeal: true
