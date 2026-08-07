@@ -32,17 +32,12 @@ spec:
                 name: portal-developer
           state: AccessReview
 
-      # Hub-local Virtualization — platform admins only
+      # Hub Virtualization — Enabled for demo testing (was platform-admin AccessReview)
       - id: virtualization-perspective
         visibility:
-          accessReview:
-            required:
-              - group: config.openshift.io
-                resource: clusteroperators
-                verb: list
-          state: AccessReview
+          state: Enabled
 
-      # Fleet Management — platform operators only (tenants use VMaaS plugin perspective)
+      # Fleet Management — platform operators only (tenants use VMaaS)
       - id: acm
         visibility:
           accessReview:
@@ -51,3 +46,8 @@ spec:
                 resource: clusteroperators
                 verb: list
           state: AccessReview
+
+      # VMaaS portal — Enabled for everyone during testing (not SAR-gated)
+      - id: vmaas
+        visibility:
+          state: Enabled
