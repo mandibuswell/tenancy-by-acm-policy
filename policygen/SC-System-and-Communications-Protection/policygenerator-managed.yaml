@@ -22,6 +22,7 @@ policyDefaults:
 
 policies:
   - name: tenancy-managed-tenant-crd
+    description: Deploys the Tenant CRD and tenancies namespace to managed clusters for policy compatibility.
     complianceType: mustonlyhave
     controls:
       - Deploy Tenant CRD to Managed Clusters
@@ -30,6 +31,7 @@ policies:
       - path: tenancy/tenancies-namespace.yaml
 
   - name: tenancy-managed-tenant-replication
+    description: Replicates Tenant CR definitions from the hub to managed clusters for downstream policy rendering.
     controls:
       - Deploy Tenant Definitions to Managed Clusters
     manifests:

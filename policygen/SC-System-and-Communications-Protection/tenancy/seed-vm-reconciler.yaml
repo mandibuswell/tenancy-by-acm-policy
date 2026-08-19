@@ -57,7 +57,6 @@ data:
       export PATH="/tmp:${PATH}"
     fi
 
-    DEFAULT_CLUSTER="${DEFAULT_CLUSTER:-virtualisation-cluster}"
     DEFAULT_CPU="${DEFAULT_CPU:-1}"
     DEFAULT_MEMORY="${DEFAULT_MEMORY:-2Gi}"
     DEFAULT_DISK="${DEFAULT_DISK:-30Gi}"
@@ -67,21 +66,59 @@ data:
       oc patch tenant "$name" -n "$ns" --subresource=status --type=merge -p "$payload" 2>/dev/null || true
     }
 
-    resolve_cluster() {
+    eligible_clusters_json() {
+      oc get managedcluster -o json 2>/dev/null | jq -c '
+        [.items[]
+          | select(.metadata.labels["tenancy.acm.io/capability-vm"] == "true")
+          | select([.status.conditions[]?
+              | select(.type == "ManagedClusterConditionAvailable" and .status == "True")] | length > 0)
+          | {name: .metadata.name, zone: (.metadata.labels["tenancy.acm.io/zone"] // "")}
+        ] | sort_by(.name)' || echo '[]'
+    }
+
+    resolve_single_cluster() {
       local wanted=$1
-      if [ -n "$wanted" ] && oc get managedcluster "$wanted" &>/dev/null; then
-        echo "$wanted"
-        return 0
+      local eligible
+      eligible=$(eligible_clusters_json)
+      if [ -n "$wanted" ]; then
+        if echo "$eligible" | jq -e --arg c "$wanted" '.[] | select(.name == $c)' >/dev/null 2>&1; then
+          echo "$wanted"
+          return 0
+        fi
       fi
-      if oc get managedcluster "$DEFAULT_CLUSTER" &>/dev/null; then
-        echo "$DEFAULT_CLUSTER"
-        return 0
+      echo "$eligible" | jq -r '.[0].name // empty'
+    }
+
+    resolve_target_clusters() {
+      local mode=$1 wanted_cluster=$2 zones_json=$3 clusters_json=$4
+      local eligible targets
+      eligible=$(eligible_clusters_json)
+      case "$mode" in
+        all)
+          echo "$eligible" | jq -r '.[].name'
+          ;;
+        selected)
+          targets=$(jq -nc --argjson eligible "$eligible" --argjson zones "$zones_json" --argjson clusters "$clusters_json" '
+            ($eligible | map(.name)) as $enames
+            | [ $clusters[]? | select($enames | index(.) ) ]
+            | . + [ $eligible[] | select(.zone != "" and (.zone as $z | $zones | index($z))) | .name ]
+            | unique
+            | .[]' )
+          echo "$targets"
+          ;;
+        single|*)
+          resolve_single_cluster "$wanted_cluster"
+          ;;
+      esac
+    }
+
+    manifestwork_name() {
+      local mode=$1 cluster=$2 vm=$3
+      if [ "$mode" = "single" ]; then
+        echo "seed-${vm}-vm"
+      else
+        echo "seed-${vm}-vm-${cluster}"
       fi
-      oc get managedcluster -o json | jq -r '
-        .items[]
-        | select(.metadata.labels["tenancy.acm.io/capability-vm"] == "true")
-        | select([.status.conditions[]? | select(.type=="ManagedClusterConditionAvailable" and .status=="True")] | length > 0)
-        | .metadata.name' | head -1
     }
 
     apply_manifestwork() {
@@ -213,6 +250,79 @@ data:
         done
     }
 
+    cleanup_stale_seed_manifestworks() {
+      local tenant=$1 mode=$2 vm=$3 desired_clusters
+      desired_clusters=$(printf '%s\n' "$4" | sort -u | grep -v '^$' || true)
+      oc get manifestwork -A -l "tenancy.acm.io/seed-vm=true,tenancy.acm.io/tenant=${tenant}" -o json 2>/dev/null \
+        | jq -c '.items[]?' | while read -r mw; do
+          [ -z "$mw" ] && continue
+          local mwn mwc cluster expected
+          mwn=$(echo "$mw" | jq -r '.metadata.name')
+          mwc=$(echo "$mw" | jq -r '.metadata.namespace')
+          expected=$(manifestwork_name "$mode" "$mwc" "$vm")
+          if [ "$mwn" != "$expected" ]; then
+            echo "Deleting stale ManifestWork ${mwc}/${mwn} for tenant ${tenant}"
+            oc delete manifestwork "$mwn" -n "$mwc" --ignore-not-found
+            continue
+          fi
+          if ! echo "$desired_clusters" | grep -qx "$mwc"; then
+            echo "Deleting ManifestWork ${mwc}/${mwn} — cluster no longer selected for tenant ${tenant}"
+            oc delete manifestwork "$mwn" -n "$mwc" --ignore-not-found
+          fi
+        done
+    }
+
+    target_feedback_status() {
+      local cluster=$1 mw=$2
+      local printable phase msg
+      printable=$(oc get manifestwork "$mw" -n "$cluster" \
+        -o jsonpath='{.status.resourceStatus.manifests[0].statusFeedback.values[?(@.name=="printableStatus")].fieldValue.string}' \
+        2>/dev/null || true)
+      phase="Pending"
+      msg="ManifestWork applied"
+      if [ "$printable" = "Running" ]; then
+        phase="Ready"
+        msg="Starter VM is Running"
+      elif [ -n "$printable" ]; then
+        msg="VM status: ${printable}"
+      fi
+      jq -nc \
+        --arg cluster "$cluster" --arg mw "$mw" --arg phase "$phase" \
+        --arg msg "$msg" --arg ps "$printable" \
+        '{cluster:$cluster,manifestWork:$mw,phase:$phase,message:$msg,printableStatus:$ps}'
+    }
+
+    aggregate_seed_status() {
+      local vm=$1 targets_json=$2
+      jq -nc --arg vm "$vm" --argjson targets "$targets_json" '
+        ($targets | length) as $n
+        | ($targets | map(select(.phase == "Ready")) | length) as $ready
+        | ($targets | map(select(.phase == "Error")) | length) as $errors
+        | (if $n == 0 then "Error"
+           elif $ready == $n then "Ready"
+           elif $ready > 0 then "Partial"
+           elif $errors > 0 then "Error"
+           else "Pending" end) as $phase
+        | (if $n == 0 then "No eligible VM clusters for seeding"
+           elif $ready == $n then "Starter VMs running on all \($n) cluster(s)"
+           elif $ready > 0 then "Starter VMs running on \($ready) of \($n) cluster(s)"
+           else "ManifestWork applied to \($n) cluster(s)" end) as $msg
+        | ($targets[0] // {}) as $first
+        | {
+            status: {
+              seedVm: {
+                phase: $phase,
+                message: $msg,
+                vmName: $vm,
+                cluster: ($first.cluster // ""),
+                manifestWork: ($first.manifestWork // ""),
+                printableStatus: ($first.printableStatus // ""),
+                targets: $targets
+              }
+            }
+          }'
+    }
+
     TENANTS_JSON=$(oc get tenants -A -o json)
     echo "$TENANTS_JSON" | jq -c '.items[]?' | while read -r item; do
       [ -z "$item" ] && continue
@@ -239,48 +349,55 @@ data:
       fi
 
       CLUSTER_WANTED=$(echo "$SEED_JSON" | jq -r '.cluster // empty')
+      MODE=$(echo "$SEED_JSON" | jq -r '.mode // empty')
+      if [ -z "$MODE" ]; then
+        MODE=single
+      fi
+      ZONES_JSON=$(echo "$SEED_JSON" | jq -c '.zones // []')
+      CLUSTERS_JSON=$(echo "$SEED_JSON" | jq -c '.clusters // []')
       VM_NAME=$(echo "$SEED_JSON" | jq -r --arg t "$NAME" '.vmName // "\($t)-starter"')
       CPU=$(echo "$SEED_JSON" | jq -r --arg d "$DEFAULT_CPU" '.cpu // $d')
       MEMORY=$(echo "$SEED_JSON" | jq -r --arg d "$DEFAULT_MEMORY" '.memory // $d')
       DISK=$(echo "$SEED_JSON" | jq -r --arg d "$DEFAULT_DISK" '.disk // $d')
       WORKLOAD_NS=$(echo "$item" | jq -r --arg t "$NAME" '.spec.workloadNamespace // $t')
-      MW_NAME="seed-${VM_NAME}-vm"
 
-      CLUSTER=$(resolve_cluster "$CLUSTER_WANTED")
-      if [ -z "$CLUSTER" ]; then
-        STATUS=$(jq -nc --arg msg "No VM-capable managed cluster found" --arg vm "$VM_NAME" \
-          '{status:{seedVm:{phase:"Error",message:$msg,vmName:$vm}}}')
+      if [ "$MODE" = "selected" ]; then
+        zone_count=$(echo "$ZONES_JSON" | jq 'length')
+        cluster_count=$(echo "$CLUSTERS_JSON" | jq 'length')
+        if [ "$zone_count" -eq 0 ] && [ "$cluster_count" -eq 0 ]; then
+          patch_status "$NS" "$NAME" '{"status":{"seedVm":{"phase":"Error","message":"mode=selected requires zones and/or clusters","vmName":"'"$VM_NAME"'"}}}'
+          echo "Tenant ${NAME}: selected mode without zones/clusters"
+          continue
+        fi
+      fi
+
+      mapfile -t TARGET_CLUSTERS < <(resolve_target_clusters "$MODE" "$CLUSTER_WANTED" "$ZONES_JSON" "$CLUSTERS_JSON" | grep -v '^$' || true)
+      if [ "${#TARGET_CLUSTERS[@]}" -eq 0 ]; then
+        STATUS=$(jq -nc --arg msg "No eligible VM-capable managed cluster found" --arg vm "$VM_NAME" \
+          '{status:{seedVm:{phase:"Error",message:$msg,vmName:$vm,targets:[]}}}')
         patch_status "$NS" "$NAME" "$STATUS"
         echo "Tenant ${NAME}: no cluster"
         continue
       fi
 
-      if ! apply_manifestwork "$CLUSTER" "$MW_NAME" "$WORKLOAD_NS" "$VM_NAME" "$CPU" "$MEMORY" "$DISK" "$NAME"; then
-        STATUS=$(jq -nc \
-          --arg cluster "$CLUSTER" --arg vm "$VM_NAME" --arg mw "$MW_NAME" \
-          '{status:{seedVm:{phase:"Error",message:"Failed to apply ManifestWork",cluster:$cluster,vmName:$vm,manifestWork:$mw}}}')
-        patch_status "$NS" "$NAME" "$STATUS"
-        continue
-      fi
+      cleanup_stale_seed_manifestworks "$NAME" "$MODE" "$VM_NAME" "$(printf '%s\n' "${TARGET_CLUSTERS[@]}")"
 
-      PRINTABLE=$(oc get manifestwork "$MW_NAME" -n "$CLUSTER" \
-        -o jsonpath='{.status.resourceStatus.manifests[0].statusFeedback.values[?(@.name=="printableStatus")].fieldValue.string}' \
-        2>/dev/null || true)
-      PHASE="Pending"
-      MSG="ManifestWork applied"
-      if [ "$PRINTABLE" = "Running" ]; then
-        PHASE="Ready"
-        MSG="Starter VM is Running"
-      elif [ -n "$PRINTABLE" ]; then
-        MSG="VM status: ${PRINTABLE}"
-      fi
+      TARGETS_JSON='[]'
+      for CLUSTER in "${TARGET_CLUSTERS[@]}"; do
+        MW_NAME=$(manifestwork_name "$MODE" "$CLUSTER" "$VM_NAME")
+        if ! apply_manifestwork "$CLUSTER" "$MW_NAME" "$WORKLOAD_NS" "$VM_NAME" "$CPU" "$MEMORY" "$DISK" "$NAME"; then
+          entry=$(jq -nc --arg cluster "$CLUSTER" --arg mw "$MW_NAME" \
+            '{cluster:$cluster,manifestWork:$mw,phase:"Error",message:"Failed to apply ManifestWork",printableStatus:""}')
+          TARGETS_JSON=$(echo "$TARGETS_JSON" | jq --argjson item "$entry" '. + [$item]')
+          continue
+        fi
+        entry=$(target_feedback_status "$CLUSTER" "$MW_NAME")
+        TARGETS_JSON=$(echo "$TARGETS_JSON" | jq --argjson item "$entry" '. + [$item]')
+        echo "Reconciled tenant ${NAME} seed VM ${VM_NAME} on ${CLUSTER}"
+      done
 
-      STATUS=$(jq -nc \
-        --arg phase "$PHASE" --arg msg "$MSG" --arg cluster "$CLUSTER" \
-        --arg vm "$VM_NAME" --arg mw "$MW_NAME" --arg ps "$PRINTABLE" \
-        '{status:{seedVm:{phase:$phase,message:$msg,cluster:$cluster,vmName:$vm,manifestWork:$mw,printableStatus:$ps}}}')
+      STATUS=$(aggregate_seed_status "$VM_NAME" "$TARGETS_JSON")
       patch_status "$NS" "$NAME" "$STATUS"
-      echo "Reconciled tenant ${NAME} seed VM ${VM_NAME} on ${CLUSTER} (${PHASE})"
     done
 
     cleanup_orphan_manifestworks

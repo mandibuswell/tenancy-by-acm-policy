@@ -22,6 +22,7 @@ policyDefaults:
 
 policies:
   - name: tenancy-hub-console-and-vm-rbac
+    description: Grants tenant groups hub VM fleet view and propagates per-tenant VM/namespace RBAC to managed clusters via MCRA.
     controls:
       - Grant Hub Console and VM Management Access
     consolidateManifests: false

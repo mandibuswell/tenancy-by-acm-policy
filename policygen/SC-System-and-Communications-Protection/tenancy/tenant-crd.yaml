@@ -52,20 +52,40 @@ spec:
                   properties:
                     phase:
                       type: string
-                      description: Pending, Ready, Skipped, Error, or Disabled.
+                      description: Pending, Ready, Partial, Skipped, Error, or Disabled.
                     message:
                       type: string
                     cluster:
                       type: string
-                      description: Managed cluster hosting the ManifestWork.
+                      description: >-
+                        Legacy single-target cluster field (first target when multiple).
                     vmName:
                       type: string
                     manifestWork:
                       type: string
-                      description: ManifestWork name in the cluster namespace.
+                      description: >-
+                        Legacy single-target ManifestWork name (first target when multiple).
                     printableStatus:
                       type: string
-                      description: Latest VirtualMachine printableStatus from ManifestWork feedback.
+                      description: >-
+                        Legacy single-target VM status (first target when multiple).
+                    targets:
+                      type: array
+                      description: Per-cluster seed VM status when mode is all or selected.
+                      items:
+                        type: object
+                        properties:
+                          cluster:
+                            type: string
+                          manifestWork:
+                            type: string
+                          phase:
+                            type: string
+                            description: Pending, Ready, or Error for this cluster.
+                          printableStatus:
+                            type: string
+                          message:
+                            type: string
             spec:
               type: object
               required:
@@ -177,12 +197,38 @@ spec:
                         Create a starter VM for this tenant. Defaults to true
                         for vms/both when omitted; set false to opt out.
                         Ignored when workloadProfile is containers or clusters.
+                    mode:
+                      type: string
+                      enum:
+                        - single
+                        - all
+                        - selected
+                      default: single
+                      description: >-
+                        Seed targeting mode. single — one cluster (cluster field
+                        or resolver fallback); all — every VM-capable managed
+                        cluster; selected — clusters matching zones and/or
+                        explicit clusters list.
                     cluster:
                       type: string
                       description: >-
-                        Target managed cluster for the ManifestWork.
-                        Defaults to virtualisation-cluster, else the first
-                        Available cluster labelled tenancy.acm.io/capability-vm=true.
+                        Target managed cluster when mode is single. Defaults to
+                        the first Available cluster labelled
+                        tenancy.acm.io/capability-vm=true.
+                    zones:
+                      type: array
+                      description: >-
+                        Zone labels (tenancy.acm.io/zone) to seed when mode is
+                        selected. Unioned with clusters when both are set.
+                      items:
+                        type: string
+                    clusters:
+                      type: array
+                      description: >-
+                        Explicit managed cluster names to seed when mode is
+                        selected. Unioned with zones when both are set.
+                      items:
+                        type: string
                     vmName:
                       type: string
                       description: VirtualMachine name. Defaults to {tenant}-starter.

@@ -22,6 +22,7 @@ policyDefaults:
 
 policies:
   - name: tenancy-managed-custom-clusterroles
+    description: Creates least-privilege tenant namespace roles (tenant-ns admin/user/viewer) used by hub-driven MCRA bindings.
     controls:
       - Deploy Tenant Least-Privilege ClusterRoles for Tenant Namespaces
     complianceType: musthave

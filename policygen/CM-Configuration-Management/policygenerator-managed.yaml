@@ -22,12 +22,14 @@ policyDefaults:
 
 policies:
   - name: tenancy-managed-admin-network-policy
+    description: Enforces baseline admin network policy to protect tenant boundaries on managed clusters.
     controls:
       - Deploy Tenant admin network policy
     manifests:
       - path: network-policy/admin-network-policy.yaml
 
   - name: tenancy-managed-namespaces
+    description: Creates tenant workload namespaces on managed clusters from Tenant CR definitions.
     controls:
       - Deploy Tenant Namespaces
     dependencies:
@@ -45,6 +47,7 @@ policies:
   #   complianceType: musthave
 
   - name: tenancy-managed-quotas
+    description: Applies tenant ResourceQuota and LimitRange settings for controlled resource consumption.
     controls:
       - Deploy Tenant Resource Quotas
     dependencies:
@@ -56,6 +59,7 @@ policies:
       - path: quota/quotas-from-crd.yaml
 
   - name: tenancy-managed-udn-network
+    description: Creates tenant UserDefinedNetwork resources for per-tenant primary network isolation.
     controls:
       - Deploy Tenant Networks via UDN
     dependencies:
@@ -65,6 +69,7 @@ policies:
       - path: network/udn-from-crd.yaml
 
   - name: tenancy-managed-metallb-bgp
+    description: Configures tenant MetalLB BGP peers, pools, and advertisements for external connectivity.
     controls:
       - Deploy Tenant External Connectivity via BGP
     dependencies:
@@ -76,6 +81,7 @@ policies:
       - path: metallb/bgp-advertisement-from-crd.yaml
 
   - name: tenancy-managed-vm-namespaces
+    description: Creates tenant namespaces on VM-capable managed clusters selected for VM tenancy.
     controls:
       - Deploy Tenant Namespaces on VM clusters
     policySets:
@@ -88,6 +94,7 @@ policies:
       - path: namespace/namespaces-from-crd-vm.yaml
 
   - name: tenancy-managed-vm-quotas
+    description: Applies VM-focused tenant quotas (including AAQ-driven limits) on VM-capable managed clusters.
     controls:
       - Deploy Tenant VM Resource Quotas
     policySets:
@@ -99,6 +106,7 @@ policies:
       - path: quota/quotas-from-crd-vm.yaml
 
   - name: tenancy-managed-vm-udn-network
+    description: Creates tenant UDN isolation networks on VM-capable managed clusters.
     controls:
       - Deploy Tenant Networks via UDN on VM clusters
     policySets:
@@ -110,6 +118,7 @@ policies:
       - path: network/udn-from-crd-vm.yaml
 
   - name: tenancy-managed-vm-metallb-bgp
+    description: Configures tenant MetalLB BGP connectivity for VM-capable managed clusters.
     controls:
       - Deploy Tenant External Connectivity via BGP on VM clusters
     policySets:

@@ -28,11 +28,13 @@ policies:
   #   manifests:
   #     - path: network-policy/admin-network-policy.yaml
   - name: tenancy-hub-caas-hcp-namespaces
+    description: Creates per-tenant HCP namespaces and base quotas on the hub for CaaS profile tenants.
     controls:
       - Provision Tenant Resources
     manifests:
       - path: namespace/hub-hcp-namespaces-from-crd.yaml
   - name: tenancy-hub-console-perspective-visibility
+    description: Controls tenant console perspective visibility using portal marker ConfigMaps and SAR-based access rules.
     controls:
       - Enforce ACM Console Perspective Visibility
     manifests:
