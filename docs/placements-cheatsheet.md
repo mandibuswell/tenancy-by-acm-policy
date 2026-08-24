@@ -43,13 +43,13 @@ Apply order: **placements** → **SC** (CRD) → **AC** + **CM**.
 
 ## Placement rules
 
+All tenant policies and placements live in the **`tenancies`** namespace.
+
 | Placement name | Namespace | Selects |
 |----------------|-----------|---------|
-| `policies-placement-hub-clusters` | `policies` | Hub (`local-cluster`) |
-| `policies-placement-managed-clusters` | `policies` | `capability-container` **or** `capability-vm` |
-| `policies-placement-managed-vm-clusters` | `policies` | `capability-vm` only |
-| `tenancies-placement-hub-clusters` | `tenancies` | Hub |
-| `tenancies-placement-managed-clusters` | `tenancies` | Same OR rule as managed policies |
+| `tenancies-placement-hub-clusters` | `tenancies` | Hub (`local-cluster`) |
+| `tenancies-placement-managed-clusters` | `tenancies` | `capability-container` **or** `capability-vm` |
+| `tenancies-placement-managed-vm-clusters` | `tenancies` | `capability-vm` only |
 
 ACM treats multiple predicates as **OR**: a spoke needs **at least one** capability
 label to match the managed placements.
@@ -65,16 +65,16 @@ label to match the managed placements.
 | `tenancy-hub-tenant-definition` | SC | `tenancies-placement-hub-clusters` | `tenancy-hub-tenant-crd` | Tenant CRD + `tenancies` namespace |
 | | | | `tenancy-hub-keycloak-realms` | Keycloak realms (`manageRealm: true`) |
 | | | | `tenancy-hub-identity-reconciler` | OpenShift OAuth IdP registration |
-| `tenancy-hub-access-control` | AC | `policies-placement-hub-clusters` | `tenancy-hub-console-and-vm-rbac` | Hub CRBs + MCRAs |
-| `tenancy-hub-configuration` | CM | `policies-placement-hub-clusters` | `tenancy-hub-console-perspective-visibility` | Console perspective RBAC |
+| `tenancy-hub-access-control` | AC | `tenancies-placement-hub-clusters` | `tenancy-hub-console-and-vm-rbac` | Hub CRBs + MCRAs |
+| `tenancy-hub-configuration` | CM | `tenancies-placement-hub-clusters` | `tenancy-hub-console-perspective-visibility` | Console perspective RBAC |
 
 ### Spokes — general / container (`capability-container` OR `capability-vm`)
 
 | PolicySet | Argo app | Placement | Policies | Purpose |
 |-----------|----------|-----------|----------|---------|
 | `tenancy-managed-tenant-definition` | SC | `tenancies-placement-managed-clusters` | `tenancy-managed-tenant-foundation` | Tenant CRD, tenancies NS, hub→spoke Tenant CR sync |
-| `tenancy-managed-access-control` | AC | `policies-placement-managed-clusters` | `tenancy-managed-custom-clusterroles` | `tenant-ns:*` ClusterRoles |
-| `tenancy-managed-configuration` | CM | `policies-placement-managed-clusters` | `tenancy-managed-admin-network-policy` | Cross-tenant network deny |
+| `tenancy-managed-access-control` | AC | `tenancies-placement-managed-clusters` | `tenancy-managed-custom-clusterroles` | `tenant-ns:*` ClusterRoles |
+| `tenancy-managed-configuration` | CM | `tenancies-placement-managed-clusters` | `tenancy-managed-admin-network-policy` | Cross-tenant network deny |
 | | | | `tenancy-managed-namespaces` | Namespace (`containers` / `both`) |
 | | | | `tenancy-managed-quotas` | ResourceQuota + LimitRange (no AAQ) |
 | | | | `tenancy-managed-udn-network` | UserDefinedNetwork |
@@ -84,7 +84,7 @@ label to match the managed placements.
 
 | PolicySet | Argo app | Placement | Policies | Purpose |
 |-----------|----------|-----------|----------|---------|
-| `tenancy-managed-vm-configuration` | CM | `policies-placement-managed-vm-clusters` | `tenancy-managed-vm-namespaces` | Namespace (`vms` / `both`) |
+| `tenancy-managed-vm-configuration` | CM | `tenancies-placement-managed-vm-clusters` | `tenancy-managed-vm-namespaces` | Namespace (`vms` / `both`) |
 | | | | `tenancy-managed-vm-quotas` | ResourceQuota + AAQ + LimitRange |
 | | | | `tenancy-managed-vm-udn-network` | UDN on VM clusters |
 | | | | `tenancy-managed-vm-metallb-bgp` | MetalLB on VM clusters |
@@ -98,10 +98,10 @@ label to match the managed placements.
 
 | MCRA role | Spoke placement | Workload profile |
 |-----------|-----------------|------------------|
-| `kubevirt.io:admin/edit/view` | `policies-placement-managed-vm-clusters` | `vms`, `both` |
-| `acm-vm-extended:admin/view` | `policies-placement-managed-vm-clusters` | `vms`, `both` |
-| `tenant-ns:admin/user/viewer` | `policies-placement-managed-clusters` | `containers`, `both` |
-| `tenant-ns:admin/user/viewer` | `policies-placement-managed-vm-clusters` | `vms`, `both` |
+| `kubevirt.io:admin/edit/view` | `tenancies-placement-managed-vm-clusters` | `vms`, `both` |
+| `acm-vm-extended:admin/view` | `tenancies-placement-managed-vm-clusters` | `vms`, `both` |
+| `tenant-ns:admin/user/viewer` | `tenancies-placement-managed-clusters` | `containers`, `both` |
+| `tenant-ns:admin/user/viewer` | `tenancies-placement-managed-vm-clusters` | `vms`, `both` |
 
 Hub `ClusterRoleBinding` for `acm-vm-fleet:view` is hub-only, gated to `vms` /
 `both`.

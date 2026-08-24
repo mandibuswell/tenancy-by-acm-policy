@@ -10,7 +10,7 @@ policyDefaults:
     - AC Access Control
   controls:
     - Enforce Tenant Access
-  namespace: policies
+  namespace: tenancies
   policySets:
     - tenancy-hub-access-control
   remediationAction: enforce
@@ -38,4 +38,4 @@ policySets:
   - name: tenancy-hub-access-control
     description: Hub and fleet RBAC for tenant console access, VM lifecycle, and namespace permissions.
     placement:
-      placementName: policies-placement-hub-clusters
+      placementName: tenancies-placement-hub-clusters

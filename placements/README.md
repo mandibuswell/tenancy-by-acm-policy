@@ -1,36 +1,34 @@
 # placements/
 
-ACM Placement rules that determine which clusters receive the generated policies.
-The active placements are controlled by each subdirectory's `kustomization.yaml`.
+ACM Placement rules that determine which clusters receive tenant policies.
+All placements are deployed to the **`tenancies`** namespace (same as Policy CRs
+and Tenant CRs).
 
 See [capabilities/README.md](capabilities/README.md) for cluster capability labels.
 
 For a full map of Argo apps, PolicySets, and placements, see
 [docs/placements-cheatsheet.md](../docs/placements-cheatsheet.md).
 
-## Policies placements (`placements/policies/`, namespace: `policies`)
+## Active placements (`placements/tenancies/`)
 
 | File | Placement name | Targets |
 |---|---|---|
-| `placement-hub.yaml` | `policies-placement-hub-clusters` | Hub (`local-cluster`) |
-| `placement-managed-by-capability.yaml` | `policies-placement-managed-clusters` | `capability-container` **or** `capability-vm` (default) |
-| `placement-managed-vm-capability.yaml` | `policies-placement-managed-vm-clusters` | `capability-vm` only |
-| `placement-managed.yaml` | (legacy) | All spokes except hub |
+| `placement-hub.yaml` | `tenancies-placement-hub-clusters` | Hub (`local-cluster`) |
+| `placement-managed-by-capability.yaml` | `tenancies-placement-managed-clusters` | `capability-container` **or** `capability-vm` |
+| `placement-managed-vm-capability.yaml` | `tenancies-placement-managed-vm-clusters` | `capability-vm` only |
 
-## Tenancies placements (`placements/tenancies/`, namespace: `tenancies`)
+## Legacy (`placements/policies/`)
 
-| File | Name | Purpose |
-|---|---|---|
-| `placement-managed-by-capability.yaml` | `tenancies-placement-managed-clusters` | Tenant CR replication (capability OR) |
-| `placement-hub.yaml` | `tenancies-placement-hub-clusters` | Hub only |
+Deprecated — retained in Git for reference only. No longer applied by Argo CD.
+Use `placements/tenancies/` instead.
 
 ## How placements are used
 
-- **Hub placement** — AC/SC hub resources (CRBs, MCRAs, Tenant CRD, Keycloak).
-- **Managed placement** — CM/AC/SC spoke resources (namespaces, quotas, UDN, Tenant CR copies).
-- **VM placement** — `kubevirt.io:*` and `acm-vm-extended:*` MCRAs on hub (see `hub-mcra-virt.yaml`).
+- **Hub placement** — Tenant CRD, Keycloak, OAuth, hub RBAC (MCRAs, CRBs).
+- **Managed placement** — Container-side spoke resources (namespaces, quotas, UDN).
+- **VM placement** — VM-side spoke resources and `kubevirt.io:*` MCRAs.
 
 ## Switching strategy
 
-In `placements/policies/kustomization.yaml`, replace capability files with a legacy
-placement file if needed. See root [README.md](../README.md#cluster-placement).
+In `placements/tenancies/kustomization.yaml`, swap capability files for a legacy
+`placement-managed.yaml` if needed. See root [README.md](../README.md#cluster-placement).

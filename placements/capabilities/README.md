@@ -33,11 +33,12 @@ oc label managedcluster aws-us tenancy.acm.io/capability-container-
 
 ## What each placement selects
 
-| Placement | Namespace | Selects |
-|-----------|-----------|---------|
-| `policies-placement-managed-clusters` | `policies` | `capability-container` **or** `capability-vm` |
-| `policies-placement-managed-vm-clusters` | `policies` | `capability-vm` only |
-| `tenancies-placement-managed-clusters` | `tenancies` | same OR rule (Tenant CR replication) |
+All placements are in the **`tenancies`** namespace.
+
+| Placement | Selects |
+|-----------|---------|
+| `tenancies-placement-managed-clusters` | `capability-container` **or** `capability-vm` |
+| `tenancies-placement-managed-vm-clusters` | `capability-vm` only |
 
 Base CM/AC policies and `tenant-ns:*` MCRAs use the managed placement.
 `kubevirt.io:*` and `acm-vm-extended:*` MCRAs use the VM placement.

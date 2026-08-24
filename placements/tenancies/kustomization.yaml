@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: tenancies
 resources:
   - placement-managed-by-capability.yaml
+  - placement-managed-vm-capability.yaml
   - placement-hub.yaml
   # - placement-managed.yaml                       # All non-hub clusters (legacy)
 

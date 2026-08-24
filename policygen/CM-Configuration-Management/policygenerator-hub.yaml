@@ -10,7 +10,7 @@ policyDefaults:
     - CM Configuration Management
   controls:
     - Provision Tenant Resources
-  namespace: policies
+  namespace: tenancies
   policySets:
     - tenancy-hub-configuration
   remediationAction: enforce
@@ -49,4 +49,4 @@ policySets:
   - name: tenancy-hub-configuration
     description: Hub tenant configuration — CaaS namespaces and console perspective visibility.
     placement:
-      placementName: policies-placement-hub-clusters
+      placementName: tenancies-placement-hub-clusters

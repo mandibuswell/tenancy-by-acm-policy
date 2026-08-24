@@ -8,7 +8,7 @@ namespaces on managed clusters.
 
 ### policygenerator-hub.yaml
 
-Targets the hub cluster (`policies-placement-hub-clusters`) and creates hub-side
+Targets the hub cluster (`tenancies-placement-hub-clusters`) and creates hub-side
 configuration policies.
 
 ### policygenerator-managed.yaml
@@ -19,9 +19,9 @@ Tenant CRs are present before downstream resources are created.
 
 Two policy sets:
 
-- **`tenancy-managed-configuration`** — `policies-placement-managed-clusters`.
+- **`tenancy-managed-configuration`** — `tenancies-placement-managed-clusters`.
   Container-side resources for tenants with `workloadProfile` `containers` or `both`.
-- **`tenancy-managed-vm-configuration`** — `policies-placement-managed-vm-clusters`.
+- **`tenancy-managed-vm-configuration`** — `tenancies-placement-managed-vm-clusters`.
   VM-side resources (including AAQ) for tenants with `workloadProfile` `vms` or `both`.
 
 Per-tenant `spec.workloadProfile` defaults to **`vms`**.

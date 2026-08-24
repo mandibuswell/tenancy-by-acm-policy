@@ -8,7 +8,7 @@ on both the ACM hub and managed clusters.
 
 ### policygenerator-hub.yaml
 
-Targets the hub cluster (`policies-placement-hub-clusters`) and creates ACM fine-grained
+Targets the hub cluster (`tenancies-placement-hub-clusters`) and creates ACM fine-grained
 RBAC resources directly from Tenant CRs:
 
 - **ClusterRoleBindings** granting `acm-vm-fleet:view` to all three tenant groups
@@ -25,7 +25,7 @@ RBAC resources directly from Tenant CRs:
 
 ### policygenerator-managed.yaml
 
-Targets managed clusters (`policies-placement-managed-clusters`) and creates:
+Targets managed clusters (`tenancies-placement-managed-clusters`) and creates:
 
 - **RoleBindings** in each tenant namespace granting `admin` to the Tenant-Admin
   group, `edit` to the Tenant-User group, and `view` to the Tenant-Viewer group.
