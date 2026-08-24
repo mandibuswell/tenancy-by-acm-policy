@@ -22,7 +22,9 @@ policyDefaults:
 
 policies:
   - name: tenancy-hub-tenant-crd
-    description: Defines the Tenant CRD and tenancies namespace on the hub as the source of truth for tenancy automation.
+    description: >-
+      Influences hub: Tenant CRD and tenancies namespace — source of truth for
+      all tenant automation (must exist before other policies run).
     complianceType: mustonlyhave
     controls:
       - Hub create tenant CRD
@@ -34,7 +36,9 @@ policies:
         complianceType: musthave
 
   - name: tenancy-hub-keycloak-realms
-    description: Creates and reconciles tenant Keycloak realm imports for tenants with identity management enabled.
+    description: >-
+      Influences hub Keycloak: KeycloakRealmImport CRs for tenants with
+      identity.manageRealm enabled (pruned when Tenant CR is deleted).
     controls:
       - Provision Tenant Keycloak Realms (opt-in manageRealm only)
     dependencies:
@@ -45,7 +49,9 @@ policies:
       - path: keycloak/realm-import-from-crd.yaml
 
   - name: tenancy-hub-identity-reconciler
-    description: Registers and maintains per-tenant OpenShift OAuth identity providers from Tenant identity settings.
+    description: >-
+      Influences hub OAuth: CronJob that adds/removes per-tenant OpenShift IdPs
+      and client secrets from Tenant spec.identity settings.
     controls:
       - Register Tenant OpenShift OAuth IdPs
     dependencies:
@@ -54,7 +60,9 @@ policies:
       - path: keycloak/identity-reconciler.yaml
 
   - name: tenancy-hub-vm-seed-reconciler
-    description: Seeds starter VM resources for VM-profile tenants after tenancy prerequisites are in place.
+    description: >-
+      Influences hub + VM spokes: CronJob that fans out starter VM ManifestWorks
+      to clusters selected in Tenant spec.seedStarterVm.
     controls:
       - Seed Starter VMs for VM Tenants
     dependencies:
@@ -64,6 +72,6 @@ policies:
 
 policySets:
   - name: tenancy-hub-tenant-definition
-    description: "Hub Tenant CRD and tenancies namespace -- foundation for all tenant policies"
+    description: Hub tenant platform — CRD, Keycloak realms, OAuth IdPs, and starter VM seeding.
     placement:
       placementName: tenancies-placement-hub-clusters

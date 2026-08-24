@@ -30,7 +30,7 @@ Targets managed clusters (`policies-placement-managed-clusters`) and creates:
 - **RoleBindings** in each tenant namespace granting `admin` to the Tenant-Admin
   group, `edit` to the Tenant-User group, and `view` to the Tenant-Viewer group.
 
-This policy depends on `tenancy-managed-tenant-replication` (tenancies namespace) being Compliant,
+This policy depends on `tenancy-managed-tenant-foundation` (tenancies namespace) being Compliant,
 which ensures the Tenant CRD and replicated Tenant CRs are present before RoleBindings
 are created. Managed-cluster policies iterate the local Tenant CRs directly using
 `{{ range }}` and `lookup`.

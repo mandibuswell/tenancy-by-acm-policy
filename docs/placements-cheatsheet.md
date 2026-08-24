@@ -72,8 +72,7 @@ label to match the managed placements.
 
 | PolicySet | Argo app | Placement | Policies | Purpose |
 |-----------|----------|-----------|----------|---------|
-| `tenancy-managed-tenant-definition` | SC | `tenancies-placement-managed-clusters` | `tenancy-managed-tenant-crd` | Tenant CRD on spoke |
-| | | | `tenancy-managed-tenant-replication` | Replicate Tenant CRs hub → spoke |
+| `tenancy-managed-tenant-definition` | SC | `tenancies-placement-managed-clusters` | `tenancy-managed-tenant-foundation` | Tenant CRD, tenancies NS, hub→spoke Tenant CR sync |
 | `tenancy-managed-access-control` | AC | `policies-placement-managed-clusters` | `tenancy-managed-custom-clusterroles` | `tenant-ns:*` ClusterRoles |
 | `tenancy-managed-configuration` | CM | `policies-placement-managed-clusters` | `tenancy-managed-admin-network-policy` | Cross-tenant network deny |
 | | | | `tenancy-managed-namespaces` | Namespace (`containers` / `both`) |
@@ -124,9 +123,7 @@ Hub `ClusterRoleBinding` for `acm-vm-fleet:view` is hub-only, gated to `vms` /
 ```
 tenancy-hub-tenant-crd                 (hub — CRD must exist first)
         ↓
-tenancy-managed-tenant-crd             (spoke — CRD on spokes)
-        ↓
-tenancy-managed-tenant-replication
+tenancy-managed-tenant-foundation      (spoke — CRD, namespace, Tenant CR replication)
         ↓
 tenancy-managed-namespaces
 tenancy-managed-vm-namespaces
@@ -134,7 +131,7 @@ tenancy-managed-vm-namespaces
 quotas → udn → metallb
 ```
 
-CM policies depend on `tenancy-managed-tenant-replication` being **Compliant**
+CM policies depend on `tenancy-managed-tenant-foundation` being **Compliant**
 before creating namespaces.
 
 ---

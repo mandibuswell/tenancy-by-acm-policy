@@ -13,7 +13,7 @@ configuration policies.
 
 ### policygenerator-managed.yaml
 
-Targets managed clusters and depends on `tenancy-managed-tenant-replication`
+Targets managed clusters and depends on `tenancy-managed-tenant-foundation`
 (tenancies namespace) being Compliant — ensuring the Tenant CRD and replicated
 Tenant CRs are present before downstream resources are created.
 

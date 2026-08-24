@@ -22,7 +22,9 @@ policyDefaults:
 
 policies:
   - name: tenancy-hub-console-and-vm-rbac
-    description: Grants tenant groups hub VM fleet view and propagates per-tenant VM/namespace RBAC to managed clusters via MCRA.
+    description: >-
+      Influences hub console + spokes (via MCRA): fleet VM visibility, per-tenant
+      kubevirt/namespace roles, VMaaS and Developer portal RBAC.
     controls:
       - Grant Hub Console and VM Management Access
     consolidateManifests: false
@@ -34,6 +36,6 @@ policies:
 
 policySets:
   - name: tenancy-hub-access-control
-    description: Hub RBAC for ACM console visibility and all tenant namespace permissions (VM operations + least-privilege namespace access) propagated to managed clusters via MulticlusterRoleAssignments
+    description: Hub and fleet RBAC for tenant console access, VM lifecycle, and namespace permissions.
     placement:
       placementName: policies-placement-hub-clusters
