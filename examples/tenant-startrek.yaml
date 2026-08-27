@@ -7,7 +7,7 @@
 #
 # After apply, ACM policy creates KeycloakRealmImport (manageRealm) and the
 # identity reconciler registers startrek-idp on oauth/cluster. Seed users:
-#   admin@startrek.local / user@startrek.local  (password: Workshop99!)
+#   admin@startrek.local / user@startrek.local  (password: HugAPug2026!)
 #
 # Optional branding after the tenant exists:
 #   use-cases/acm-tenancy-keycloak/apply-themes.sh -t startrek
@@ -78,5 +78,5 @@ spec:
       realm: startrek
       manageRealm: true
       seedUsers: true
-      seedPassword: Workshop99!
+      seedPassword: HugAPug2026!
       requirePasswordChange: true

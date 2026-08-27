@@ -12,7 +12,7 @@ object-templates-raw: |
   {{- $kcCr := "main" }}
   {{- $realm := $name }}
   {{- $seedUsers := false }}
-  {{- $seedPassword := "password" }}
+  {{- $seedPassword := "HugAPug2026!" }}
   {{- $seedPasswordTemporary := false }}
   {{- if $identity.keycloak }}
   {{- if $identity.keycloak.namespace }}{{ $kcNs = $identity.keycloak.namespace }}{{- end }}
