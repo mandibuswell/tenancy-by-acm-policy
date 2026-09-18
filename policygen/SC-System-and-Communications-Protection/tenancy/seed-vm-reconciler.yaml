@@ -245,7 +245,7 @@ data:
             .items[] | select(.metadata.name == $t)
           ' >/dev/null 2>&1; then
             echo "Deleting orphan ManifestWork ${mwc}/${mwn} for deleted tenant ${tenant}"
-            oc delete manifestwork "$mwn" -n "$mwc" --ignore-not-found
+            oc delete manifestwork "$mwn" -n "$mwc" --wait=false --ignore-not-found
           fi
         done
     }
@@ -262,12 +262,12 @@ data:
           expected=$(manifestwork_name "$mode" "$mwc" "$vm")
           if [ "$mwn" != "$expected" ]; then
             echo "Deleting stale ManifestWork ${mwc}/${mwn} for tenant ${tenant}"
-            oc delete manifestwork "$mwn" -n "$mwc" --ignore-not-found
+            oc delete manifestwork "$mwn" -n "$mwc" --wait=false --ignore-not-found
             continue
           fi
           if ! echo "$desired_clusters" | grep -qx "$mwc"; then
             echo "Deleting ManifestWork ${mwc}/${mwn} — cluster no longer selected for tenant ${tenant}"
-            oc delete manifestwork "$mwn" -n "$mwc" --ignore-not-found
+            oc delete manifestwork "$mwn" -n "$mwc" --wait=false --ignore-not-found
           fi
         done
     }
