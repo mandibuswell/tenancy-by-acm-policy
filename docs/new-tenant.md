@@ -288,7 +288,7 @@ On the next policy / reconciler cycle:
 | **OAuth IdP** (`{tenant}-idp`) | Yes | Identity reconciler CronJob removes IdPs whose `openshift-{tenant}` client has no Tenant CR |
 | **Client secret** (`openshift-config/{tenant}-client-secret`) | Yes | Reconciler deletes default secret after removing orphan IdP |
 | **Portal RoleBindings** (`tenancies/*-portal-vmaas`, `*-portal-developer`) | Yes | Dropped when tenant leaves `hub-tenant-console-rbac` template range (after Argo sync) |
-| **Custom theme** (ConfigMap + Keycloak mount) | No | Run `apply-themes.sh -d -t TENANT` in the demo repo |
+| **Custom theme** (ConfigMap + Keycloak mount) | No — kept on purpose | Mounted once by `apply-themes.sh --no-tenant`. Survives tenant delete so recreate still shows the login CSS. Remove only with `apply-themes.sh -d -t TENANT --purge-themes`. |
 | **Hub ClusterRoleBindings / MCRAs** | No | AC Application has `prune: false` — remove manually or sync with prune |
 
 **Custom identity fields:** IdP/secret cleanup assumes default naming (`openshift-{tenant}` client, `{tenant}-client-secret`). Tenants with custom `clientId` or `clientSecretRef.name` may need manual OAuth/secret cleanup after delete.

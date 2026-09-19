@@ -138,6 +138,8 @@ data:
     }
 
     # Tear down IdP, client secret, and platform-managed Keycloak realm when SSO is disabled.
+    # Do not delete keycloak-theme-* ConfigMaps or Keycloak CR volume mounts. Those
+    # are installed once by apply-themes.sh and must survive tenant delete/recreate.
     cleanup_disabled_tenant_identity() {
       local name=$1 ns=$2
       local identity_json="${3-}"
