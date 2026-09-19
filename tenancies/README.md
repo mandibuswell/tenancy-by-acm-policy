@@ -34,8 +34,8 @@ Reference examples:
 - [`examples/tenant-gigashadow-identity.yaml`](../examples/tenant-gigashadow-identity.yaml)
 
 Each example includes an `openshift-config` client secret plus `spec.identity`
-(`manageRealm` + `seedUsers`). Do **not** use HTPasswd (`09-tenant-users` /
-`10-tenant-groups`) for this path — groups come from Keycloak OIDC claims.
+(`manageRealm` + `seedUsers`). Do **not** apply `10-tenant-groups.yaml` for this
+path — the HTPasswd OAuth file was removed, and groups come from Keycloak OIDC claims.
 
 ACM policies then provision namespaces, quotas, UDN, MetalLB, Keycloak realms,
 OAuth IdPs, and (by default) a starter VM.

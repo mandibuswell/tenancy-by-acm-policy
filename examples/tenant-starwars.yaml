@@ -12,8 +12,8 @@
 # Optional branding after the tenant exists:
 #   use-cases/acm-tenancy-keycloak/apply-themes.sh -t starwars
 #
-# Do NOT apply use-cases/acm-tenancy/09-tenant-users.yaml or 10-tenant-groups.yaml
-# for this path — groups come from Keycloak OIDC claims.
+# Do NOT apply use-cases/acm-tenancy/10-tenant-groups.yaml for this path.
+# The HTPasswd OAuth file was removed. Groups come from Keycloak OIDC claims.
 ---
 apiVersion: v1
 kind: Secret
