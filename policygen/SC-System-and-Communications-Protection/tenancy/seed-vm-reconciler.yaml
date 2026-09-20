@@ -98,7 +98,7 @@ data:
           echo "$eligible" | jq -r '.[].name'
           ;;
         selected)
-          targets=$(jq -nc --argjson eligible "$eligible" --argjson zones "$zones_json" --argjson clusters "$clusters_json" '
+          targets=$(jq -nr --argjson eligible "$eligible" --argjson zones "$zones_json" --argjson clusters "$clusters_json" '
             ($eligible | map(.name)) as $enames
             | [ $clusters[]? | select($enames | index(.) ) ]
             | . + [ $eligible[] | select(.zone != "" and (.zone as $z | $zones | index($z))) | .name ]
