@@ -23,9 +23,11 @@ if ! oc get keycloak main -n keycloak-system -o jsonpath='{.status.conditions[?(
   exit 1
 fi
 
-TENANTS=("${@}")
-if [[ ${#TENANTS[@]} -eq 0 ]]; then
+# With set -u, "${@}" errors when no args are passed (bash 4.4+).
+if [[ $# -eq 0 ]]; then
   TENANTS=(starwars startrek)
+else
+  TENANTS=("$@")
 fi
 
 for t in "${TENANTS[@]}"; do
