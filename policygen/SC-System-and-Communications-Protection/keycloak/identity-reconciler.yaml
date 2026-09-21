@@ -28,6 +28,11 @@ rules:
   - apiGroups: ["k8s.keycloak.org"]
     resources: ["keycloakrealmimports"]
     verbs: ["get", "list", "delete"]
+  # Stale User/Identity mappings block login after Keycloak realm recreate
+  # ("Could not create user" / preferred_username already claimed).
+  - apiGroups: ["user.openshift.io"]
+    resources: ["users", "identities"]
+    verbs: ["get", "list", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -137,19 +142,57 @@ data:
       fi
     }
 
+    # Delete OpenShift Identity objects for an IdP and their linked Users.
+    # Also removes orphan *@<tenant>.local Users (seed accounts) that may remain
+    # after Identities were already deleted. Required so tenant delete+recreate
+    # (new Keycloak user UUIDs, same preferred_username) does not fail with
+    # "Could not create user" / "cannot be claimed by identity".
+    delete_openshift_users_for_tenant() {
+      local tenant=$1
+      local idp_name="${2-}"
+      local identity_json="${3-}"
+      local id_name user_name
+      if [ -z "$idp_name" ]; then
+        if [ -n "${identity_json-}" ] && [ "$identity_json" != "{}" ]; then
+          idp_name=$(echo "$identity_json" | jq -r ".consoleLoginName // \"${tenant}-idp\"")
+        else
+          idp_name="${tenant}-idp"
+        fi
+      fi
+      while read -r id_name; do
+        [ -z "$id_name" ] && continue
+        user_name=$(oc get identity "$id_name" -o jsonpath='{.user.name}' 2>/dev/null || true)
+        echo "Deleting identity ${id_name}"
+        oc delete identity "$id_name" --ignore-not-found
+        if [ -n "$user_name" ]; then
+          echo "Deleting user ${user_name}"
+          oc delete user "$user_name" --ignore-not-found
+        fi
+      done < <(oc get identity -o json 2>/dev/null | jq -r --arg p "$idp_name" \
+        '.items[]? | select(.providerName == $p) | .metadata.name')
+      while read -r user_name; do
+        [ -z "$user_name" ] && continue
+        echo "Deleting orphan seed user ${user_name}"
+        oc delete user "$user_name" --ignore-not-found
+      done < <(oc get users -o json 2>/dev/null | jq -r --arg suffix "@${tenant}.local" \
+        '.items[]? | select(.metadata.name | endswith($suffix)) | .metadata.name')
+    }
+
     # Tear down IdP, client secret, and platform-managed Keycloak realm when SSO is disabled.
     # Do not delete keycloak-theme-* ConfigMaps or Keycloak CR volume mounts. Those
     # are installed once by apply-themes.sh and must survive tenant delete/recreate.
     cleanup_disabled_tenant_identity() {
       local name=$1 ns=$2
       local identity_json="${3-}"
-      local manage_realm kc_ns realm import_ns import_name
+      local manage_realm kc_ns realm import_ns import_name idp_name
       if [ -z "$identity_json" ]; then
         identity_json=$(oc get tenant "$name" -n "$ns" -o json | jq -c '.spec.identity // {}')
       fi
       echo "SSO disabled for tenant ${name}; cleaning up identity resources"
+      idp_name=$(echo "$identity_json" | jq -r ".consoleLoginName // \"${name}-idp\"")
       remove_oauth_idp_for_tenant "$name"
       delete_tenant_client_secret "$name" "$identity_json"
+      delete_openshift_users_for_tenant "$name" "$idp_name" "$identity_json"
       manage_realm=$(echo "$identity_json" | jq -r '.keycloak.manageRealm // false')
       if [ "$manage_realm" = "true" ]; then
         kc_ns=$(echo "$identity_json" | jq -r '.keycloak.namespace // "keycloak-system"')
@@ -185,6 +228,7 @@ data:
               removed=$((removed + 1))
               oauth_json=$(oc get oauth cluster -o json)
               delete_tenant_client_secret "$tenant" '{}'
+              delete_openshift_users_for_tenant "$tenant" "$idp_name"
               delete_keycloak_db_realm "$tenant"
             fi
           fi
@@ -194,6 +238,40 @@ data:
       if [ "$removed" -gt 0 ]; then
         echo "Removed ${removed} orphan identity provider(s)"
       fi
+    }
+
+    # Catch User/Identity leftovers when the OAuth IdP was already removed (or
+    # never matched openshift-{tenant}). Default IdP name is {tenant}-idp.
+    cleanup_orphan_openshift_users() {
+      local tenant_names id_name provider tenant user_name
+      tenant_names=$(oc get tenants.dusty-seahorse.io -n tenancies -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+      while read -r row; do
+        [ -z "$row" ] && continue
+        id_name=$(echo "$row" | jq -r '.name')
+        provider=$(echo "$row" | jq -r '.provider')
+        user_name=$(echo "$row" | jq -r '.user // empty')
+        if [[ "$provider" =~ ^(.+)-idp$ ]]; then
+          tenant="${BASH_REMATCH[1]}"
+          if ! echo "$tenant_names" | grep -qx "$tenant"; then
+            echo "Deleting orphan identity ${id_name} (tenant ${tenant} gone)"
+            oc delete identity "$id_name" --ignore-not-found
+            if [ -n "$user_name" ] && [ "$user_name" != "null" ]; then
+              oc delete user "$user_name" --ignore-not-found
+            fi
+          fi
+        fi
+      done < <(oc get identity -o json 2>/dev/null | jq -c \
+        '.items[]? | {name:.metadata.name,provider:.providerName,user:(.user.name // "")}')
+      while read -r user_name; do
+        [ -z "$user_name" ] && continue
+        if [[ "$user_name" =~ @(.+)\.local$ ]]; then
+          tenant="${BASH_REMATCH[1]}"
+          if ! echo "$tenant_names" | grep -qx "$tenant"; then
+            echo "Deleting orphan user ${user_name} (tenant ${tenant} gone)"
+            oc delete user "$user_name" --ignore-not-found
+          fi
+        fi
+      done < <(oc get users -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
     }
 
     # Fallback if policy prune lags: delete realm imports whose tenant CR is gone.
@@ -339,6 +417,7 @@ data:
     cleanup_orphan_identity_providers
     cleanup_orphan_realm_imports
     cleanup_orphan_keycloak_db_realms
+    cleanup_orphan_openshift_users
 ---
 apiVersion: batch/v1
 kind: CronJob

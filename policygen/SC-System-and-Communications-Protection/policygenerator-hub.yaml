@@ -50,8 +50,8 @@ policies:
 
   - name: tenancy-hub-identity-reconciler
     description: >-
-      Influences hub OAuth: CronJob that adds/removes per-tenant OpenShift IdPs
-      and client secrets from Tenant spec.identity settings.
+      Influences hub OAuth: CronJob that adds/removes per-tenant OpenShift IdPs,
+      client secrets, and User/Identity mappings from Tenant spec.identity settings.
     controls:
       - Register Tenant OpenShift OAuth IdPs
     dependencies:

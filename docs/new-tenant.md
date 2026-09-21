@@ -287,6 +287,7 @@ On the next policy / reconciler cycle:
 | **KeycloakRealmImport** | Yes | `tenancy-hub-keycloak-realms` uses `pruneObjectBehavior: DeleteAll` |
 | **OAuth IdP** (`{tenant}-idp`) | Yes | Identity reconciler CronJob removes IdPs whose `openshift-{tenant}` client has no Tenant CR |
 | **Client secret** (`openshift-config/{tenant}-client-secret`) | Yes | Reconciler deletes default secret after removing orphan IdP |
+| **OpenShift Users + Identities** | Yes | Reconciler deletes Identities for `{tenant}-idp` (or `consoleLoginName`) and linked Users, plus orphan `@<tenant>.local` seed users — prevents “Could not create user” after delete+recreate |
 | **Portal RoleBindings** (`tenancies/*-portal-vmaas`, `*-portal-developer`) | Yes | Dropped when tenant leaves `hub-tenant-console-rbac` template range (after Argo sync) |
 | **Custom theme** (ConfigMap + Keycloak mount) | No — kept on purpose | Mounted once by `apply-themes.sh --no-tenant`. Survives tenant delete so recreate still shows the login CSS. Remove only with `apply-themes.sh -d -t TENANT --purge-themes`. |
 | **Hub ClusterRoleBindings / MCRAs** | No | AC Application has `prune: false` — remove manually or sync with prune |

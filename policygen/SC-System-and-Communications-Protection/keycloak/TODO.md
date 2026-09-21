@@ -25,7 +25,7 @@ Not implemented: explicit `redirectUris` array (redirects are derived from Ingre
 
 ### OAuth IdP registration — DONE (reconciler, not policy)
 
-`identity-reconciler.yaml` CronJob patches `oauth/cluster` to add/update per-tenant OpenID IdPs, merges into the singleton (does not replace the list). Orphan IdPs and client secrets are removed when the Tenant CR is deleted. When `spec.identity.enabled` is false, the reconciler removes the IdP and client secret (and platform-managed Keycloak realms when `manageRealm` was true).
+`identity-reconciler.yaml` CronJob patches `oauth/cluster` to add/update per-tenant OpenID IdPs, merges into the singleton (does not replace the list). Orphan IdPs, client secrets, and OpenShift `User`/`Identity` objects are removed when the Tenant CR is deleted (or when SSO is disabled). When `spec.identity.enabled` is false, the reconciler removes the IdP and client secret (and platform-managed Keycloak realms when `manageRealm` was true). Clearing Users/Identities avoids “Could not create user” after Keycloak realm recreate (new Keycloak UUIDs, same preferred_username).
 
 ### Client secret lookup in realm import — DONE (with fallback)
 
@@ -40,6 +40,7 @@ Create Tenant form provisions the Secret in `openshift-config`.
 | `KeycloakRealmImport` prune | `pruneObjectBehavior: DeleteAll` on `tenancy-hub-keycloak-realms` |
 | Orphan import CRs | Identity reconciler |
 | OAuth IdP + client secret | Identity reconciler |
+| OpenShift Users + Identities | Identity reconciler (by IdP name + `@tenant.local` seed users) |
 | Keycloak DB realm | Identity reconciler Admin API sweep |
 
 ### Hub fleet RBAC on tenant delete — known issue (documented)
